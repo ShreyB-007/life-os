@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+.env.local
+
+# Vercel
+.vercel
+
+# Claude Code local tooling
+.agents/
+.claude/
+skills-lock.json
