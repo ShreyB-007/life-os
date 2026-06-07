@@ -14,7 +14,6 @@ export default function Dashboard() {
   const [logs, setLogs] = useState({ gym: [], japanese: [], dsa: [] })
   const [todayLogs, setTodayLogs] = useState({ gym: null, japanese: null, dsa: null })
   const [goals, setGoals] = useState([])
-  const [habitsDone, setHabitsDone] = useState({ gym: false, japanese: false, dsa: false })
   const initialized = useRef(false)
 
   useEffect(() => {
@@ -44,35 +43,37 @@ export default function Dashboard() {
       const dsaLogs = allLogs.filter(l => l.habit_key === 'dsa')
 
       setLogs({ gym: gymLogs, japanese: japaneseLogs, dsa: dsaLogs })
-
-      const todayGym = gymLogs.find(l => l.log_date === today) || null
-      const todayJapanese = japaneseLogs.find(l => l.log_date === today) || null
-      const todayDsa = dsaLogs.find(l => l.log_date === today) || null
-      setTodayLogs({ gym: todayGym, japanese: todayJapanese, dsa: todayDsa })
-
-      setHabitsDone({
-        gym: todayGym?.done === true || todayGym?.is_rest_day === true,
-        japanese: todayJapanese?.done === true,
-        dsa: todayDsa?.done === true,
+      setTodayLogs({
+        gym: gymLogs.find(l => l.log_date === today) ?? null,
+        japanese: japaneseLogs.find(l => l.log_date === today) ?? null,
+        dsa: dsaLogs.find(l => l.log_date === today) ?? null,
       })
     }
 
-    if (goalsRes.data) {
-      setGoals(goalsRes.data)
-    }
-
+    if (goalsRes.data) setGoals(goalsRes.data)
     initialized.current = true
   }
 
-  function markDone(habit) {
-    setHabitsDone(prev => ({ ...prev, [habit]: true }))
+  // Called by each card after every log operation (optimistic).
+  // Replaces today's entry in logs[] and updates todayLogs.
+  function onLog(habitKey, logEntry) {
+    const date = logEntry.log_date
+    setLogs(prev => ({
+      ...prev,
+      [habitKey]: [logEntry, ...prev[habitKey].filter(l => l.log_date !== date)],
+    }))
+    setTodayLogs(prev => ({ ...prev, [habitKey]: logEntry }))
   }
 
   const gymStreak = computeStreak(logs.gym, [0])
   const japaneseStreak = computeStreak(logs.japanese, [])
   const dsaStreak = computeStreak(logs.dsa, [])
 
-  const allDone = habitsDone.gym && habitsDone.japanese && habitsDone.dsa
+  // Derived — recomputes whenever todayLogs changes, handles un-logging correctly.
+  const allDone =
+    (todayLogs.gym?.done === true || todayLogs.gym?.is_rest_day === true) &&
+    todayLogs.japanese?.done === true &&
+    todayLogs.dsa?.done === true
 
   return (
     <div className="max-w-[1200px] mx-auto px-6 py-8">
@@ -80,7 +81,6 @@ export default function Dashboard() {
 
       <AllDoneBanner visible={allDone} />
 
-      {/* Habit cards */}
       <div className="mb-6">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-500 dark:text-gray-500 mb-3">
           Today's check-ins
@@ -89,24 +89,23 @@ export default function Dashboard() {
           <GymCard
             streak={gymStreak}
             todayLog={todayLogs.gym}
-            onDone={() => markDone('gym')}
+            onLog={onLog}
           />
           <JapaneseCard
             streak={japaneseStreak}
             todayLog={todayLogs.japanese}
             allLogs={logs.japanese}
-            onDone={() => markDone('japanese')}
+            onLog={onLog}
           />
           <DSACard
             streak={dsaStreak}
             todayLog={todayLogs.dsa}
-            onDone={() => markDone('dsa')}
+            onLog={onLog}
           />
         </div>
       </div>
 
       <GoalsSection goals={goals} />
-
       <BottomRow goals={goals} />
     </div>
   )

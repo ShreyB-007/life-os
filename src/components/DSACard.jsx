@@ -9,28 +9,33 @@ const DIFFICULTIES = [
   { key: 'hard', label: 'Hard', className: 'text-red-600 dark:text-red-500' },
 ]
 
-export default function DSACard({ streak, todayLog, onDone }) {
+export default function DSACard({ streak, todayLog, onLog }) {
   const [counts, setCounts] = useState({ easy: 0, med: 0, hard: 0 })
   const [prevDone, setPrevDone] = useState(false)
   const [booped, setBooped] = useState(false)
   const saveTimer = useRef(null)
+  // Ref mirrors counts so adjust() always reads the latest value without
+  // stale-closure issues from rapid consecutive button presses.
+  const countsRef = useRef(counts)
 
   useEffect(() => {
     if (todayLog?.payload) {
       const { easy = 0, med = 0, hard = 0 } = todayLog.payload
-      setCounts({ easy, med, hard })
+      const loaded = { easy, med, hard }
+      setCounts(loaded)
+      countsRef.current = loaded
     }
   }, [todayLog])
 
   const total = counts.easy + counts.med + counts.hard
   const isDone = total > 0
 
+  // Drive boop animation on done transition (independent of onLog).
   useEffect(() => {
     if (isDone && !prevDone) {
       setPrevDone(true)
       setBooped(false)
       setTimeout(() => setBooped(true), 10)
-      onDone()
     }
     if (!isDone && prevDone) {
       setPrevDone(false)
@@ -38,28 +43,29 @@ export default function DSACard({ streak, todayLog, onDone }) {
   }, [isDone])
 
   function adjust(key, delta) {
-    setCounts(prev => {
-      const next = { ...prev, [key]: Math.max(0, prev[key] + delta) }
-      scheduleSave(next)
-      return next
-    })
-  }
+    const prev = countsRef.current
+    const next = { ...prev, [key]: Math.max(0, prev[key] + delta) }
+    countsRef.current = next
+    setCounts(next)
 
-  function scheduleSave(nextCounts) {
+    const newTotal = next.easy + next.med + next.hard
+    const logEntry = {
+      habit_key: 'dsa',
+      log_date: todayStr(),
+      done: newTotal > 0,
+      is_rest_day: false,
+      payload: next,
+      logged_at: new Date().toISOString(),
+    }
+    // Optimistic update — streak and banner react immediately.
+    onLog('dsa', logEntry)
+
+    // Debounce the actual Supabase write by 1 s.
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
-      const newTotal = nextCounts.easy + nextCounts.med + nextCounts.hard
-      supabase.from('habit_logs').upsert(
-        {
-          habit_key: 'dsa',
-          log_date: todayStr(),
-          done: newTotal > 0,
-          is_rest_day: false,
-          payload: nextCounts,
-          logged_at: new Date().toISOString(),
-        },
-        { onConflict: 'habit_key,log_date' }
-      )
+      supabase
+        .from('habit_logs')
+        .upsert(logEntry, { onConflict: 'habit_key,log_date' })
     }, 1000)
   }
 
@@ -72,7 +78,6 @@ export default function DSACard({ streak, todayLog, onDone }) {
           : 'border-zinc-200 bg-white dark:border-gray-800 dark:bg-gray-900',
       ].join(' ')}
     >
-      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <i className="ti ti-code text-purple-500 dark:text-purple-400 text-lg" />
@@ -81,13 +86,10 @@ export default function DSACard({ streak, todayLog, onDone }) {
         <StreakDisplay count={isDone ? streak : 0} />
       </div>
 
-      {/* Counter rows */}
       <div className="flex flex-col gap-3 mb-4">
         {DIFFICULTIES.map(({ key, label, className }) => (
           <div key={key} className="flex items-center justify-between">
-            <span className={`text-sm font-medium w-12 ${className}`}>
-              {label}
-            </span>
+            <span className={`text-sm font-medium w-12 ${className}`}>{label}</span>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => adjust(key, -1)}
@@ -109,7 +111,6 @@ export default function DSACard({ streak, todayLog, onDone }) {
         ))}
       </div>
 
-      {/* Footer */}
       <div className="flex justify-end">
         <span
           className={[
@@ -117,9 +118,7 @@ export default function DSACard({ streak, todayLog, onDone }) {
             isDone ? 'text-green-600 dark:text-green-400' : 'text-zinc-400 dark:text-gray-500',
           ].join(' ')}
         >
-          {isDone
-            ? `${counts.easy}E · ${counts.med}M · ${counts.hard}H solved`
-            : 'Not started'}
+          {isDone ? `${counts.easy}E · ${counts.med}M · ${counts.hard}H solved` : 'Not started'}
         </span>
       </div>
     </div>

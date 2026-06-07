@@ -10,7 +10,7 @@ const SUBTASKS = [
   { key: 'study', label: 'Study session' },
 ]
 
-export default function JapaneseCard({ streak, todayLog, allLogs, onDone }) {
+export default function JapaneseCard({ streak, todayLog, allLogs, onLog }) {
   const [checked, setChecked] = useState({ anki: false, duolingo: false, study: false })
   const [prevDone, setPrevDone] = useState(false)
   const [booped, setBooped] = useState(false)
@@ -24,12 +24,12 @@ export default function JapaneseCard({ streak, todayLog, allLogs, onDone }) {
   const doneCount = Object.values(checked).filter(Boolean).length
   const isDone = doneCount >= 2
 
+  // Drive boop animation on done transition (independent of onLog).
   useEffect(() => {
     if (isDone && !prevDone) {
       setPrevDone(true)
       setBooped(false)
       setTimeout(() => setBooped(true), 10)
-      onDone()
     }
     if (!isDone && prevDone) {
       setPrevDone(false)
@@ -39,19 +39,20 @@ export default function JapaneseCard({ streak, todayLog, allLogs, onDone }) {
   async function toggle(key) {
     const next = { ...checked, [key]: !checked[key] }
     setChecked(next)
-    const today = todayStr()
     const newDone = Object.values(next).filter(Boolean).length >= 2
-    await supabase.from('habit_logs').upsert(
-      {
-        habit_key: 'japanese',
-        log_date: today,
-        done: newDone,
-        is_rest_day: false,
-        payload: { subtasks: next },
-        logged_at: new Date().toISOString(),
-      },
-      { onConflict: 'habit_key,log_date' }
-    )
+    const logEntry = {
+      habit_key: 'japanese',
+      log_date: todayStr(),
+      done: newDone,
+      is_rest_day: false,
+      payload: { subtasks: next },
+      logged_at: new Date().toISOString(),
+    }
+    // Optimistic update — streak and banner react immediately.
+    onLog('japanese', logEntry)
+    await supabase
+      .from('habit_logs')
+      .upsert(logEntry, { onConflict: 'habit_key,log_date' })
   }
 
   return (
@@ -63,7 +64,6 @@ export default function JapaneseCard({ streak, todayLog, allLogs, onDone }) {
           : 'border-zinc-200 bg-white dark:border-gray-800 dark:bg-gray-900',
       ].join(' ')}
     >
-      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <i className="ti ti-language text-blue-500 dark:text-blue-400 text-lg" />
@@ -72,7 +72,6 @@ export default function JapaneseCard({ streak, todayLog, allLogs, onDone }) {
         <StreakDisplay count={streak} />
       </div>
 
-      {/* Subtasks */}
       <div className="flex flex-col gap-2.5 mb-4">
         {SUBTASKS.map(({ key, label }) => {
           const subStreak = computeSubtaskStreak(allLogs, key)
@@ -102,7 +101,6 @@ export default function JapaneseCard({ streak, todayLog, allLogs, onDone }) {
         })}
       </div>
 
-      {/* Footer */}
       <div className="flex justify-end">
         <span
           className={[

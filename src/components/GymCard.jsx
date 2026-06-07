@@ -10,7 +10,7 @@ const WORKOUT_TYPES = [
   { key: 'Cardio', subtitle: 'Endurance' },
 ]
 
-export default function GymCard({ streak, todayLog, onDone }) {
+export default function GymCard({ streak, todayLog, onLog }) {
   const [selected, setSelected] = useState(null)
   const [isRest, setIsRest] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -30,25 +30,22 @@ export default function GymCard({ streak, todayLog, onDone }) {
 
   const isDone = selected !== null || isRest
 
+  // Optimistically updates parent logs state, then persists to Supabase.
   async function save(workoutType, restDay) {
-    setSaving(true)
-    const today = todayStr()
-    await supabase.from('habit_logs').upsert(
-      {
-        habit_key: 'gym',
-        log_date: today,
-        done: true,
-        is_rest_day: restDay,
-        payload: { workout_type: workoutType },
-        logged_at: new Date().toISOString(),
-      },
-      { onConflict: 'habit_key,log_date' }
-    )
-    setSaving(false)
-    if (!booped) {
-      setBooped(true)
-      onDone()
+    const logEntry = {
+      habit_key: 'gym',
+      log_date: todayStr(),
+      done: true,
+      is_rest_day: restDay,
+      payload: { workout_type: workoutType },
+      logged_at: new Date().toISOString(),
     }
+    onLog('gym', logEntry)
+    setSaving(true)
+    await supabase
+      .from('habit_logs')
+      .upsert(logEntry, { onConflict: 'habit_key,log_date' })
+    setSaving(false)
   }
 
   function selectWorkout(type) {
@@ -81,7 +78,6 @@ export default function GymCard({ streak, todayLog, onDone }) {
           : 'border-zinc-200 bg-white dark:border-gray-800 dark:bg-gray-900',
       ].join(' ')}
     >
-      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <i className="ti ti-barbell text-amber-500 dark:text-amber-400 text-lg" />
@@ -90,7 +86,6 @@ export default function GymCard({ streak, todayLog, onDone }) {
         <StreakDisplay count={streak} />
       </div>
 
-      {/* Workout grid */}
       <div className="grid grid-cols-2 gap-2 mb-4">
         {WORKOUT_TYPES.map(({ key, subtitle }) => {
           const active = selected === key
@@ -112,7 +107,6 @@ export default function GymCard({ streak, todayLog, onDone }) {
         })}
       </div>
 
-      {/* Footer */}
       <div className="flex items-center justify-between">
         <button
           onClick={markRest}
@@ -131,11 +125,7 @@ export default function GymCard({ streak, todayLog, onDone }) {
             isDone ? 'text-green-600 dark:text-green-400' : 'text-zinc-400 dark:text-gray-500',
           ].join(' ')}
         >
-          {isRest
-            ? 'Rest day — streak saved'
-            : selected
-            ? `Done — ${selected}`
-            : 'Select workout'}
+          {isRest ? 'Rest day — streak saved' : selected ? `Done — ${selected}` : 'Select workout'}
         </span>
       </div>
     </div>
