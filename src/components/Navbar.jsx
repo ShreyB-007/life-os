@@ -10,9 +10,9 @@ const links = [
 
 export default function Navbar({ dark, onToggleDark }) {
   return (
-    <nav className="sticky top-0 z-50 border-b bg-white dark:bg-gray-950 border-zinc-200 dark:border-gray-800">
-      <div className="max-w-[1200px] mx-auto px-6 flex items-center justify-between h-14 overflow-x-auto">
-        <div className="flex items-center gap-1 shrink-0">
+    <nav className="sticky top-0 z-50 border-b bg-white dark:bg-void-950 border-zinc-200 dark:border-void-800 backdrop-blur-sm">
+      <div className="max-w-[1200px] mx-auto px-6 flex items-center justify-between h-13 overflow-x-auto">
+        <div className="flex items-center gap-0.5 shrink-0">
           {links.map(link => (
             <NavLink
               key={link.to}
@@ -20,21 +20,28 @@ export default function Navbar({ dark, onToggleDark }) {
               end={link.to === '/'}
               className={({ isActive }) =>
                 [
-                  'px-3 py-1 text-sm font-medium whitespace-nowrap transition-colors duration-150',
+                  'relative px-3 py-2 text-sm font-body font-medium whitespace-nowrap transition-colors duration-150',
                   isActive
-                    ? 'text-zinc-900 dark:text-white border-b-2 border-zinc-900 dark:border-white pb-[2px]'
-                    : 'text-zinc-500 dark:text-gray-400 hover:text-zinc-800 dark:hover:text-gray-200',
+                    ? 'text-zinc-900 dark:text-white'
+                    : 'text-zinc-500 dark:text-slate-500 hover:text-zinc-800 dark:hover:text-slate-300',
                 ].join(' ')
               }
             >
-              {link.label}
+              {({ isActive }) => (
+                <>
+                  {link.label}
+                  {isActive && (
+                    <span className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full bg-amber-500 dark:bg-amber-400" />
+                  )}
+                </>
+              )}
             </NavLink>
           ))}
         </div>
 
         <button
           onClick={onToggleDark}
-          className="ml-4 shrink-0 p-2 rounded-lg transition-colors duration-150 text-zinc-500 dark:text-gray-400 hover:text-zinc-900 dark:hover:text-gray-100 hover:bg-zinc-100 dark:hover:bg-gray-800"
+          className="ml-4 shrink-0 p-2 rounded-lg transition-colors duration-150 text-zinc-400 dark:text-slate-500 hover:text-zinc-900 dark:hover:text-slate-200 hover:bg-zinc-100 dark:hover:bg-void-800"
           aria-label="Toggle dark mode"
         >
           <i className={`ti ti-${dark ? 'sun' : 'moon'} text-lg`} />

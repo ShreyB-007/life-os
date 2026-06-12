@@ -24,7 +24,6 @@ export default function JapaneseCard({ streak, todayLog, allLogs, onLog }) {
   const doneCount = Object.values(checked).filter(Boolean).length
   const isDone = doneCount >= 2
 
-  // Drive boop animation on done transition (independent of onLog).
   useEffect(() => {
     if (isDone && !prevDone) {
       setPrevDone(true)
@@ -48,68 +47,85 @@ export default function JapaneseCard({ streak, todayLog, allLogs, onLog }) {
       payload: { subtasks: next },
       logged_at: new Date().toISOString(),
     }
-    // Optimistic update — streak and banner react immediately.
     onLog('japanese', logEntry)
-    await supabase
-      .from('habit_logs')
-      .upsert(logEntry, { onConflict: 'habit_key,log_date' })
+    await supabase.from('habit_logs').upsert(logEntry, { onConflict: 'habit_key,log_date' })
   }
 
   return (
     <div
       className={[
-        'p-4 rounded-xl border transition-all duration-300',
+        'relative overflow-hidden rounded-xl border transition-all duration-300',
         isDone
-          ? 'border-green-500 bg-green-50 dark:border-green-700 dark:bg-green-950/40 ' + (booped ? 'animate-boop' : '')
-          : 'border-zinc-200 bg-white dark:border-gray-800 dark:bg-gray-900',
+          ? 'bg-white dark:bg-void-900 border-emerald-300/40 dark:border-emerald-800/30 ' + (booped ? 'animate-boop' : '')
+          : 'bg-white dark:bg-void-900 border-zinc-200 dark:border-void-800 hover:-translate-y-px',
       ].join(' ')}
+      style={isDone ? { boxShadow: '0 0 0 1px rgba(16,185,129,0.15), 0 0 28px rgba(16,185,129,0.06)' } : {}}
     >
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <i className="ti ti-language text-blue-500 dark:text-blue-400 text-lg" />
-          <span className="font-semibold text-sm text-zinc-900 dark:text-gray-100">Japanese</span>
+      {/* Left accent bar */}
+      <div
+        className="card-accent-bar"
+        style={{ backgroundColor: isDone ? '#10b981' : '#3b82f6' }}
+      />
+
+      <div className="p-4 pl-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <i className="ti ti-language text-blue-500 dark:text-blue-400 text-lg" />
+            <span className="font-display font-semibold text-sm text-zinc-900 dark:text-slate-100">Japanese</span>
+          </div>
+          <StreakDisplay count={streak} />
         </div>
-        <StreakDisplay count={streak} />
-      </div>
 
-      <div className="flex flex-col gap-2.5 mb-4">
-        {SUBTASKS.map(({ key, label }) => {
-          const subStreak = computeSubtaskStreak(allLogs, key)
-          return (
-            <div key={key} className="flex items-center justify-between">
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={checked[key]}
-                  onChange={() => toggle(key)}
-                  className="w-[15px] h-[15px] rounded accent-blue-500 cursor-pointer"
-                />
-                <span className="text-sm text-zinc-700 dark:text-gray-300">{label}</span>
-              </label>
-              <div className="flex items-center gap-1 text-xs text-zinc-400 dark:text-gray-500">
-                {subStreak > 0 ? (
-                  <>
-                    <i className="ti ti-flame text-amber-500 dark:text-amber-400 text-xs" />
-                    <span>{subStreak}</span>
-                  </>
-                ) : (
-                  <span>—</span>
-                )}
+        <div className="flex flex-col gap-3 mb-4">
+          {SUBTASKS.map(({ key, label }) => {
+            const subStreak = computeSubtaskStreak(allLogs, key)
+            return (
+              <div key={key} className="flex items-center justify-between">
+                <label className="flex items-center gap-2.5 cursor-pointer group">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={checked[key]}
+                      onChange={() => toggle(key)}
+                      className="w-[15px] h-[15px] rounded cursor-pointer"
+                    />
+                  </div>
+                  <span
+                    className={[
+                      'text-sm font-body transition-colors duration-150',
+                      checked[key]
+                        ? 'text-zinc-500 dark:text-slate-500 line-through'
+                        : 'text-zinc-700 dark:text-slate-300',
+                    ].join(' ')}
+                  >
+                    {label}
+                  </span>
+                </label>
+                <div className="flex items-center gap-1 text-xs text-zinc-400 dark:text-slate-600">
+                  {subStreak > 0 ? (
+                    <>
+                      <i className="ti ti-flame text-amber-500 dark:text-amber-400 text-xs" />
+                      <span className="font-mono">{subStreak}</span>
+                    </>
+                  ) : (
+                    <span>—</span>
+                  )}
+                </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
 
-      <div className="flex justify-end">
-        <span
-          className={[
-            'text-xs',
-            isDone ? 'text-green-600 dark:text-green-400' : 'text-zinc-400 dark:text-gray-500',
-          ].join(' ')}
-        >
-          {doneCount} of 3 done
-        </span>
+        <div className="flex justify-end">
+          <span
+            className={[
+              'text-xs font-body',
+              isDone ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400 dark:text-slate-600',
+            ].join(' ')}
+          >
+            {doneCount} of 3 done
+          </span>
+        </div>
       </div>
     </div>
   )
