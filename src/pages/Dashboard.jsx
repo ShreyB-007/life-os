@@ -83,7 +83,7 @@ export default function Dashboard() {
       <AllDoneBanner visible={allDone} />
 
       <div className="mb-6">
-        <p className="text-[11px] font-body font-semibold uppercase tracking-widest text-zinc-400 dark:text-slate-600 mb-3">
+        <p className="text-[11px] font-body font-semibold uppercase tracking-widest mb-3" style={{ color: '#4A4A60' }}>
           Today's check-ins
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

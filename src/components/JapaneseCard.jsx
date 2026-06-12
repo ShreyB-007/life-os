@@ -54,26 +54,33 @@ export default function JapaneseCard({ streak, todayLog, allLogs, onLog }) {
   return (
     <div
       className={[
-        'relative overflow-hidden rounded-xl border transition-all duration-300',
-        isDone
-          ? 'bg-white dark:bg-void-900 border-emerald-300/40 dark:border-emerald-800/30 ' + (booped ? 'animate-boop' : '')
-          : 'bg-white dark:bg-void-900 border-zinc-200 dark:border-void-800 hover:-translate-y-px',
+        'relative overflow-hidden rounded-xl transition-all duration-200',
+        isDone ? '' : 'card-interactive',
+        booped && isDone ? 'animate-boop' : '',
       ].join(' ')}
-      style={isDone ? { boxShadow: '0 0 0 1px rgba(16,185,129,0.15), 0 0 28px rgba(16,185,129,0.06)' } : {}}
+      style={isDone ? {
+        background: 'rgba(16,185,129,0.06)',
+        border: '1px solid rgba(16,185,129,0.25)',
+        borderTop: '1px solid rgba(16,185,129,0.5)',
+        boxShadow: '0 0 20px rgba(16,185,129,0.06) inset',
+      } : {
+        background: '#0F0F1A',
+        border: '1px solid #1C1C2E',
+      }}
     >
       {/* Left accent bar */}
       <div
         className="card-accent-bar"
-        style={{ backgroundColor: isDone ? '#10b981' : '#3b82f6' }}
+        style={{ backgroundColor: isDone ? '#10b981' : '#6366F1' }}
       />
 
       <div className="p-4 pl-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <i className="ti ti-language text-blue-500 dark:text-blue-400 text-lg" />
-            <span className="font-display font-semibold text-sm text-zinc-900 dark:text-slate-100">Japanese</span>
+            <i className="ti ti-language text-indigo-400 text-lg" />
+            <span className="font-display font-semibold text-sm text-zinc-900 dark:text-os-fg">Japanese</span>
           </div>
-          <StreakDisplay count={streak} />
+          <StreakDisplay count={streak} flash={booped} />
         </div>
 
         <div className="flex flex-col gap-3 mb-4">
@@ -81,30 +88,24 @@ export default function JapaneseCard({ streak, todayLog, allLogs, onLog }) {
             const subStreak = computeSubtaskStreak(allLogs, key)
             return (
               <div key={key} className="flex items-center justify-between">
-                <label className="flex items-center gap-2.5 cursor-pointer group">
-                  <div className="relative">
-                    <input
-                      type="checkbox"
-                      checked={checked[key]}
-                      onChange={() => toggle(key)}
-                      className="w-[15px] h-[15px] rounded cursor-pointer"
-                    />
-                  </div>
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={checked[key]}
+                    onChange={() => toggle(key)}
+                    className="w-[15px] h-[15px] rounded cursor-pointer"
+                  />
                   <span
-                    className={[
-                      'text-sm font-body transition-colors duration-150',
-                      checked[key]
-                        ? 'text-zinc-500 dark:text-slate-500 line-through'
-                        : 'text-zinc-700 dark:text-slate-300',
-                    ].join(' ')}
+                    className="text-sm font-body transition-colors duration-150"
+                    style={{ color: checked[key] ? '#4A4A60' : '#8888A0', textDecoration: checked[key] ? 'line-through' : 'none' }}
                   >
                     {label}
                   </span>
                 </label>
-                <div className="flex items-center gap-1 text-xs text-zinc-400 dark:text-slate-600">
+                <div className="flex items-center gap-1 text-xs" style={{ color: '#4A4A60' }}>
                   {subStreak > 0 ? (
                     <>
-                      <i className="ti ti-flame text-amber-500 dark:text-amber-400 text-xs" />
+                      <i className="ti ti-flame text-xs" style={{ color: '#F59E0B' }} />
                       <span className="font-mono">{subStreak}</span>
                     </>
                   ) : (
@@ -117,12 +118,7 @@ export default function JapaneseCard({ streak, todayLog, allLogs, onLog }) {
         </div>
 
         <div className="flex justify-end">
-          <span
-            className={[
-              'text-xs font-body',
-              isDone ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400 dark:text-slate-600',
-            ].join(' ')}
-          >
+          <span className="text-xs font-body" style={{ color: isDone ? '#10b981' : '#4A4A60' }}>
             {doneCount} of 3 done
           </span>
         </div>

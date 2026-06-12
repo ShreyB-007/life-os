@@ -4,9 +4,9 @@ import { todayStr } from '../lib/date'
 import StreakDisplay from './StreakDisplay'
 
 const DIFFICULTIES = [
-  { key: 'easy', label: 'Easy', color: '#22c55e', darkColor: '#4ade80' },
-  { key: 'med',  label: 'Med',  color: '#f59e0b', darkColor: '#fbbf24' },
-  { key: 'hard', label: 'Hard', color: '#ef4444', darkColor: '#f87171' },
+  { key: 'easy', label: 'Easy', color: '#10B981' },
+  { key: 'med',  label: 'Med',  color: '#F59E0B' },
+  { key: 'hard', label: 'Hard', color: '#EF4444' },
 ]
 
 export default function DSACard({ streak, todayLog, onLog }) {
@@ -65,50 +65,60 @@ export default function DSACard({ streak, todayLog, onLog }) {
   return (
     <div
       className={[
-        'relative overflow-hidden rounded-xl border transition-all duration-300',
-        isDone
-          ? 'bg-white dark:bg-void-900 border-emerald-300/40 dark:border-emerald-800/30 ' + (booped ? 'animate-boop' : '')
-          : 'bg-white dark:bg-void-900 border-zinc-200 dark:border-void-800 hover:-translate-y-px',
+        'relative overflow-hidden rounded-xl transition-all duration-200',
+        isDone ? '' : 'card-interactive',
+        booped && isDone ? 'animate-boop' : '',
       ].join(' ')}
-      style={isDone ? { boxShadow: '0 0 0 1px rgba(16,185,129,0.15), 0 0 28px rgba(16,185,129,0.06)' } : {}}
+      style={isDone ? {
+        background: 'rgba(16,185,129,0.06)',
+        border: '1px solid rgba(16,185,129,0.25)',
+        borderTop: '1px solid rgba(16,185,129,0.5)',
+        boxShadow: '0 0 20px rgba(16,185,129,0.06) inset',
+      } : {
+        background: '#0F0F1A',
+        border: '1px solid #1C1C2E',
+      }}
     >
       {/* Left accent bar */}
       <div
         className="card-accent-bar"
-        style={{ backgroundColor: isDone ? '#10b981' : '#a855f7' }}
+        style={{ backgroundColor: isDone ? '#10b981' : '#8B5CF6' }}
       />
 
       <div className="p-4 pl-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <i className="ti ti-code text-purple-500 dark:text-purple-400 text-lg" />
-            <span className="font-display font-semibold text-sm text-zinc-900 dark:text-slate-100">DSA</span>
+            <i className="ti ti-code text-violet-400 text-lg" />
+            <span className="font-display font-semibold text-sm text-zinc-900 dark:text-os-fg">DSA</span>
           </div>
-          <StreakDisplay count={isDone ? streak : 0} />
+          <StreakDisplay count={isDone ? streak : 0} flash={booped} />
         </div>
 
         <div className="flex flex-col gap-3 mb-4">
-          {DIFFICULTIES.map(({ key, label, color, darkColor }) => (
+          {DIFFICULTIES.map(({ key, label, color }) => (
             <div key={key} className="flex items-center justify-between">
-              <span
-                className="text-sm font-body font-semibold w-10"
-                style={{ color }}
-              >
+              <span className="text-sm font-body font-semibold w-10" style={{ color }}>
                 {label}
               </span>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => adjust(key, -1)}
-                  className="w-7 h-7 rounded border border-zinc-200 dark:border-void-750 text-zinc-500 dark:text-slate-500 hover:border-zinc-300 dark:hover:border-void-700 hover:bg-zinc-50 dark:hover:bg-void-800 transition-colors text-sm font-mono flex items-center justify-center"
+                  className="w-7 h-7 rounded font-mono text-sm flex items-center justify-center transition-all duration-150"
+                  style={{ border: '1px solid #1C1C2E', color: '#8888A0' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#2E2E52'; e.currentTarget.style.background = '#141428' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#1C1C2E'; e.currentTarget.style.background = 'transparent' }}
                 >
                   −
                 </button>
-                <span className="w-6 text-center text-sm font-mono font-medium tabular-nums text-zinc-900 dark:text-slate-200">
+                <span className="w-6 text-center text-sm font-mono font-medium tabular-nums dark:text-os-fg">
                   {counts[key]}
                 </span>
                 <button
                   onClick={() => adjust(key, 1)}
-                  className="w-7 h-7 rounded border border-zinc-200 dark:border-void-750 text-zinc-500 dark:text-slate-500 hover:border-zinc-300 dark:hover:border-void-700 hover:bg-zinc-50 dark:hover:bg-void-800 transition-colors text-sm font-mono flex items-center justify-center"
+                  className="w-7 h-7 rounded font-mono text-sm flex items-center justify-center transition-all duration-150"
+                  style={{ border: '1px solid #1C1C2E', color: '#8888A0' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#2E2E52'; e.currentTarget.style.background = '#141428' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#1C1C2E'; e.currentTarget.style.background = 'transparent' }}
                 >
                   +
                 </button>
@@ -118,12 +128,7 @@ export default function DSACard({ streak, todayLog, onLog }) {
         </div>
 
         <div className="flex justify-end">
-          <span
-            className={[
-              'text-xs font-body',
-              isDone ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400 dark:text-slate-600',
-            ].join(' ')}
-          >
+          <span className="text-xs font-body" style={{ color: isDone ? '#10b981' : '#4A4A60' }}>
             {isDone ? `${counts.easy}E · ${counts.med}M · ${counts.hard}H solved` : 'Not started'}
           </span>
         </div>

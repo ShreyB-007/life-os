@@ -95,26 +95,33 @@ export default function GymCard({ streak, todayLog, allLogs = [], onLog }) {
   return (
     <div
       className={[
-        'relative overflow-hidden rounded-xl border transition-all duration-300',
-        isDone
-          ? 'bg-white dark:bg-void-900 border-emerald-300/40 dark:border-emerald-800/30 ' + (booped ? 'animate-boop' : '')
-          : 'bg-white dark:bg-void-900 border-zinc-200 dark:border-void-800 hover:-translate-y-px',
+        'relative overflow-hidden rounded-xl transition-all duration-200',
+        isDone ? '' : 'card-interactive',
+        booped && isDone ? 'animate-boop' : '',
       ].join(' ')}
-      style={isDone ? { boxShadow: '0 0 0 1px rgba(16,185,129,0.15), 0 0 28px rgba(16,185,129,0.06)' } : {}}
+      style={isDone ? {
+        background: 'rgba(16,185,129,0.06)',
+        border: '1px solid rgba(16,185,129,0.25)',
+        borderTop: '1px solid rgba(16,185,129,0.5)',
+        boxShadow: '0 0 20px rgba(16,185,129,0.06) inset',
+      } : {
+        background: '#0F0F1A',
+        border: '1px solid #1C1C2E',
+      }}
     >
       {/* Left accent bar */}
       <div
         className="card-accent-bar"
-        style={{ backgroundColor: isDone ? '#10b981' : '#f59e0b' }}
+        style={{ backgroundColor: isDone ? '#10b981' : '#F59E0B' }}
       />
 
       <div className="p-4 pl-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <i className="ti ti-barbell text-amber-500 dark:text-amber-400 text-lg" />
-            <span className="font-display font-semibold text-sm text-zinc-900 dark:text-slate-100">Gym</span>
+            <span className="font-display font-semibold text-sm text-zinc-900 dark:text-os-fg">Gym</span>
           </div>
-          <StreakDisplay count={streak} />
+          <StreakDisplay count={streak} flash={booped} />
         </div>
 
         <div className="grid grid-cols-2 gap-2 mb-4">
@@ -124,15 +131,31 @@ export default function GymCard({ streak, todayLog, allLogs = [], onLog }) {
               <button
                 key={key}
                 onClick={() => selectWorkout(key)}
-                className={[
-                  'flex flex-col items-start px-3 py-2.5 rounded-lg border text-left transition-all duration-150',
-                  active
-                    ? 'bg-amber-50 dark:bg-amber-500/15 border-amber-400/60 dark:border-amber-500/50 text-amber-700 dark:text-amber-300'
-                    : 'border-zinc-200 dark:border-void-750 text-zinc-600 dark:text-slate-400 hover:border-zinc-300 dark:hover:border-void-700 hover:bg-zinc-50 dark:hover:bg-void-800',
-                ].join(' ')}
+                className="flex flex-col items-start px-3 py-2.5 rounded-lg text-left transition-all duration-150"
+                style={active ? {
+                  background: 'rgba(245,158,11,0.1)',
+                  border: '1px solid rgba(245,158,11,0.4)',
+                  color: '#F59E0B',
+                } : {
+                  background: 'transparent',
+                  border: '1px solid #1C1C2E',
+                  color: '#8888A0',
+                }}
+                onMouseEnter={e => {
+                  if (!active) {
+                    e.currentTarget.style.background = '#141428'
+                    e.currentTarget.style.borderColor = '#2E2E52'
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!active) {
+                    e.currentTarget.style.background = 'transparent'
+                    e.currentTarget.style.borderColor = '#1C1C2E'
+                  }
+                }}
               >
                 <span className="text-sm font-body font-medium">{key}</span>
-                <span className="text-[11px] font-body text-zinc-400 dark:text-slate-600 mt-0.5">{subtitle}</span>
+                <span className="text-[11px] font-body mt-0.5" style={{ color: '#4A4A60' }}>{subtitle}</span>
               </button>
             )
           })}
@@ -143,26 +166,29 @@ export default function GymCard({ streak, todayLog, allLogs = [], onLog }) {
             <button
               onClick={markRest}
               disabled={restLimitReached}
-              className={[
-                'text-xs font-body px-2.5 py-1 rounded border transition-colors duration-150',
-                restLimitReached
-                  ? 'border-zinc-200 dark:border-void-750 text-zinc-300 dark:text-slate-700 bg-zinc-50 dark:bg-void-850 cursor-not-allowed'
-                  : isRest
-                    ? 'border-blue-400/60 dark:border-blue-500/50 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10'
-                    : 'border-zinc-300 dark:border-void-700 text-zinc-500 dark:text-slate-500 hover:border-zinc-400 dark:hover:border-void-600',
-              ].join(' ')}
+              className="text-xs font-body px-2.5 py-1 rounded transition-colors duration-150"
+              style={restLimitReached ? {
+                border: '1px solid #1C1C2E',
+                color: '#4A4A60',
+                cursor: 'not-allowed',
+              } : isRest ? {
+                border: '1px solid rgba(99,102,241,0.4)',
+                color: '#818CF8',
+                background: 'rgba(99,102,241,0.08)',
+              } : {
+                border: '1px solid #2E2E52',
+                color: '#8888A0',
+              }}
             >
               {restLimitReached ? 'Rest limit reached' : 'Rest day'}
             </button>
             {weekRestCount === 1 && !restLimitReached && (
-              <span className="text-[10px] font-body text-amber-500 dark:text-amber-400">1 of 2 rest days used</span>
+              <span className="text-[10px] font-body" style={{ color: '#F59E0B' }}>1 of 2 rest days used</span>
             )}
           </div>
           <span
-            className={[
-              'text-xs font-body',
-              isDone ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400 dark:text-slate-600',
-            ].join(' ')}
+            className="text-xs font-body"
+            style={{ color: isDone ? '#10b981' : '#4A4A60' }}
           >
             {isRest ? 'Rest day — streak saved' : selected ? `Done — ${selected}` : 'Select workout'}
           </span>
