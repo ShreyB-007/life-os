@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, forwardRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayStr } from '../lib/date'
 import { computeSubtaskStreak } from '../lib/streaks'
@@ -10,7 +10,7 @@ const SUBTASKS = [
   { key: 'study', label: 'Study session' },
 ]
 
-export default function JapaneseCard({ streak, todayLog, allLogs, onLog }) {
+const JapaneseCard = forwardRef(function JapaneseCard({ streak, todayLog, allLogs, onLog }, ref) {
   const [checked, setChecked] = useState({ anki: false, duolingo: false, study: false })
   const [prevDone, setPrevDone] = useState(false)
   const [booped, setBooped] = useState(false)
@@ -53,6 +53,7 @@ export default function JapaneseCard({ streak, todayLog, allLogs, onLog }) {
 
   return (
     <div
+      ref={ref}
       className={[
         'relative overflow-hidden rounded-xl transition-all duration-200',
         isDone ? '' : 'card-interactive',
@@ -125,4 +126,6 @@ export default function JapaneseCard({ streak, todayLog, allLogs, onLog }) {
       </div>
     </div>
   )
-}
+})
+
+export default JapaneseCard

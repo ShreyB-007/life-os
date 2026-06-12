@@ -9,12 +9,17 @@ import JapaneseCard from '../components/JapaneseCard'
 import DSACard from '../components/DSACard'
 import GoalsSection from '../components/GoalsSection'
 import BottomRow from '../components/BottomRow'
+import NeuralConstellation from '../components/NeuralConstellation'
 
 export default function Dashboard() {
   const [logs, setLogs] = useState({ gym: [], japanese: [], dsa: [] })
   const [todayLogs, setTodayLogs] = useState({ gym: null, japanese: null, dsa: null })
   const [goals, setGoals] = useState([])
   const initialized = useRef(false)
+  const constellationRef = useRef(null)
+  const gymCardRef = useRef(null)
+  const japaneseCardRef = useRef(null)
+  const dsaCardRef = useRef(null)
 
   useEffect(() => {
     fetchAll()
@@ -58,11 +63,25 @@ export default function Dashboard() {
   // Replaces today's entry in logs[] and updates todayLogs.
   function onLog(habitKey, logEntry) {
     const date = logEntry.log_date
+    const cardRefs = { gym: gymCardRef, japanese: japaneseCardRef, dsa: dsaCardRef }
+
+    setTodayLogs(prev => {
+      const wasAlreadyDone =
+        prev[habitKey]?.done === true || prev[habitKey]?.is_rest_day === true
+      const nowDone = logEntry.done === true || logEntry.is_rest_day === true
+      if (nowDone && !wasAlreadyDone) {
+        // Pulse fires after state update so the card el is correct
+        setTimeout(() => {
+          constellationRef.current?.triggerPulse(cardRefs[habitKey]?.current)
+        }, 0)
+      }
+      return { ...prev, [habitKey]: logEntry }
+    })
+
     setLogs(prev => ({
       ...prev,
       [habitKey]: [logEntry, ...prev[habitKey].filter(l => l.log_date !== date)],
     }))
-    setTodayLogs(prev => ({ ...prev, [habitKey]: logEntry }))
   }
 
   const gymStreak = computeStreak(logs.gym, [0])
@@ -78,6 +97,7 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-[1200px] mx-auto px-6 py-8">
+      <NeuralConstellation ref={constellationRef} allDone={allDone} />
       <TopBar overallStreak={overallStreak} gymStreak={gymStreak} />
 
       <AllDoneBanner visible={allDone} />
@@ -88,18 +108,21 @@ export default function Dashboard() {
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <GymCard
+            ref={gymCardRef}
             streak={gymStreak}
             todayLog={todayLogs.gym}
             allLogs={logs.gym}
             onLog={onLog}
           />
           <JapaneseCard
+            ref={japaneseCardRef}
             streak={japaneseStreak}
             todayLog={todayLogs.japanese}
             allLogs={logs.japanese}
             onLog={onLog}
           />
           <DSACard
+            ref={dsaCardRef}
             streak={dsaStreak}
             todayLog={todayLogs.dsa}
             onLog={onLog}

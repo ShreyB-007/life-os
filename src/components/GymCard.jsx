@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, forwardRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayStr } from '../lib/date'
 import StreakDisplay from './StreakDisplay'
@@ -18,7 +18,7 @@ function getMondayStr() {
   return monday.toISOString().slice(0, 10)
 }
 
-export default function GymCard({ streak, todayLog, allLogs = [], onLog }) {
+const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], onLog }, ref) {
   const [selected, setSelected] = useState(null)
   const [isRest, setIsRest] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -94,6 +94,7 @@ export default function GymCard({ streak, todayLog, allLogs = [], onLog }) {
 
   return (
     <div
+      ref={ref}
       className={[
         'relative overflow-hidden rounded-xl transition-all duration-200',
         isDone ? '' : 'card-interactive',
@@ -196,4 +197,6 @@ export default function GymCard({ streak, todayLog, allLogs = [], onLog }) {
       </div>
     </div>
   )
-}
+})
+
+export default GymCard

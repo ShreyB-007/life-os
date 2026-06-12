@@ -36,13 +36,6 @@ export default function App() {
   return (
     <div className="relative min-h-screen font-body bg-surface-50 dark:bg-void-950 text-zinc-900 dark:text-os-fg transition-colors duration-200">
 
-      {/* Animated mesh gradient blobs — dark mode only */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }}>
-        <div className="blob-1" />
-        <div className="blob-2" />
-        <div className="blob-3" />
-      </div>
-
       {/* Cursor spotlight — follows mouse, dark mode atmospheric */}
       <div
         className="fixed inset-0 pointer-events-none hidden dark:block"
