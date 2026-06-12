@@ -24,7 +24,7 @@ export default function App() {
   }, [dark])
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-zinc-900 dark:text-gray-100 transition-colors duration-200">
+    <div className="min-h-screen font-body bg-gray-50 dark:bg-void-950 text-zinc-900 dark:text-slate-100 transition-colors duration-200">
       <Navbar dark={dark} onToggleDark={() => setDark(d => !d)} />
       <Routes>
         <Route path="/" element={<Dashboard />} />

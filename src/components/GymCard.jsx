@@ -45,11 +45,8 @@ export default function GymCard({ streak, todayLog, allLogs = [], onLog }) {
 
   const isDone = selected !== null || isRest
 
-  // Count rest days this week (Mon–today) to enforce 2-per-week cap
   const mondayStr = getMondayStr()
-  const weekRestCount = allLogs.filter(
-    l => l.is_rest_day && l.log_date >= mondayStr
-  ).length
+  const weekRestCount = allLogs.filter(l => l.is_rest_day && l.log_date >= mondayStr).length
   const restLimitReached = weekRestCount >= 2
 
   async function save(workoutType, restDay, done) {
@@ -63,15 +60,12 @@ export default function GymCard({ streak, todayLog, allLogs = [], onLog }) {
     }
     onLog('gym', logEntry)
     setSaving(true)
-    await supabase
-      .from('habit_logs')
-      .upsert(logEntry, { onConflict: 'habit_key,log_date' })
+    await supabase.from('habit_logs').upsert(logEntry, { onConflict: 'habit_key,log_date' })
     setSaving(false)
   }
 
   function selectWorkout(type) {
     if (selected === type) {
-      // Deselect: revert to not-done
       setSelected(null)
       setIsRest(false)
       save(null, false, false)
@@ -101,69 +95,78 @@ export default function GymCard({ streak, todayLog, allLogs = [], onLog }) {
   return (
     <div
       className={[
-        'p-4 rounded-xl border transition-all duration-300',
+        'relative overflow-hidden rounded-xl border transition-all duration-300',
         isDone
-          ? 'border-green-500 bg-green-50 dark:border-green-700 dark:bg-green-950/40 ' + (booped ? 'animate-boop' : '')
-          : 'border-zinc-200 bg-white dark:border-gray-800 dark:bg-gray-900',
+          ? 'bg-white dark:bg-void-900 border-emerald-300/40 dark:border-emerald-800/30 ' + (booped ? 'animate-boop' : '')
+          : 'bg-white dark:bg-void-900 border-zinc-200 dark:border-void-800 hover:-translate-y-px',
       ].join(' ')}
+      style={isDone ? { boxShadow: '0 0 0 1px rgba(16,185,129,0.15), 0 0 28px rgba(16,185,129,0.06)' } : {}}
     >
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <i className="ti ti-barbell text-amber-500 dark:text-amber-400 text-lg" />
-          <span className="font-semibold text-sm text-zinc-900 dark:text-gray-100">Gym</span>
-        </div>
-        <StreakDisplay count={streak} />
-      </div>
+      {/* Left accent bar */}
+      <div
+        className="card-accent-bar"
+        style={{ backgroundColor: isDone ? '#10b981' : '#f59e0b' }}
+      />
 
-      <div className="grid grid-cols-2 gap-2 mb-4">
-        {WORKOUT_TYPES.map(({ key, subtitle }) => {
-          const active = selected === key
-          return (
+      <div className="p-4 pl-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <i className="ti ti-barbell text-amber-500 dark:text-amber-400 text-lg" />
+            <span className="font-display font-semibold text-sm text-zinc-900 dark:text-slate-100">Gym</span>
+          </div>
+          <StreakDisplay count={streak} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {WORKOUT_TYPES.map(({ key, subtitle }) => {
+            const active = selected === key
+            return (
+              <button
+                key={key}
+                onClick={() => selectWorkout(key)}
+                className={[
+                  'flex flex-col items-start px-3 py-2.5 rounded-lg border text-left transition-all duration-150',
+                  active
+                    ? 'bg-amber-50 dark:bg-amber-500/15 border-amber-400/60 dark:border-amber-500/50 text-amber-700 dark:text-amber-300'
+                    : 'border-zinc-200 dark:border-void-750 text-zinc-600 dark:text-slate-400 hover:border-zinc-300 dark:hover:border-void-700 hover:bg-zinc-50 dark:hover:bg-void-800',
+                ].join(' ')}
+              >
+                <span className="text-sm font-body font-medium">{key}</span>
+                <span className="text-[11px] font-body text-zinc-400 dark:text-slate-600 mt-0.5">{subtitle}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col items-start gap-0.5">
             <button
-              key={key}
-              onClick={() => selectWorkout(key)}
+              onClick={markRest}
+              disabled={restLimitReached}
               className={[
-                'flex flex-col items-start px-3 py-2.5 rounded-lg border text-left transition-all duration-150',
-                active
-                  ? 'bg-amber-50 dark:bg-amber-500/20 border-amber-400 dark:border-amber-500 text-amber-700 dark:text-amber-300'
-                  : 'border-zinc-200 dark:border-gray-700 text-zinc-700 dark:text-gray-300 hover:border-zinc-400 dark:hover:border-gray-500 hover:bg-zinc-50 dark:hover:bg-gray-800',
+                'text-xs font-body px-2.5 py-1 rounded border transition-colors duration-150',
+                restLimitReached
+                  ? 'border-zinc-200 dark:border-void-750 text-zinc-300 dark:text-slate-700 bg-zinc-50 dark:bg-void-850 cursor-not-allowed'
+                  : isRest
+                    ? 'border-blue-400/60 dark:border-blue-500/50 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10'
+                    : 'border-zinc-300 dark:border-void-700 text-zinc-500 dark:text-slate-500 hover:border-zinc-400 dark:hover:border-void-600',
               ].join(' ')}
             >
-              <span className="text-sm font-medium">{key}</span>
-              <span className="text-[11px] text-zinc-400 dark:text-gray-400 mt-0.5">{subtitle}</span>
+              {restLimitReached ? 'Rest limit reached' : 'Rest day'}
             </button>
-          )
-        })}
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col items-start gap-0.5">
-          <button
-            onClick={markRest}
-            disabled={restLimitReached}
+            {weekRestCount === 1 && !restLimitReached && (
+              <span className="text-[10px] font-body text-amber-500 dark:text-amber-400">1 of 2 rest days used</span>
+            )}
+          </div>
+          <span
             className={[
-              'text-xs px-2.5 py-1 rounded border transition-colors duration-150',
-              restLimitReached
-                ? 'border-zinc-200 dark:border-gray-700 text-zinc-300 dark:text-gray-600 bg-zinc-50 dark:bg-gray-800 cursor-not-allowed'
-                : isRest
-                  ? 'border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10'
-                  : 'border-zinc-300 dark:border-gray-600 text-zinc-500 dark:text-gray-400 hover:border-zinc-400 dark:hover:border-gray-400',
+              'text-xs font-body',
+              isDone ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400 dark:text-slate-600',
             ].join(' ')}
           >
-            {restLimitReached ? 'Rest limit reached' : 'Rest day'}
-          </button>
-          {weekRestCount === 1 && !restLimitReached && (
-            <span className="text-[10px] text-amber-500 dark:text-amber-400">1 of 2 rest days used</span>
-          )}
+            {isRest ? 'Rest day — streak saved' : selected ? `Done — ${selected}` : 'Select workout'}
+          </span>
         </div>
-        <span
-          className={[
-            'text-xs',
-            isDone ? 'text-green-600 dark:text-green-400' : 'text-zinc-400 dark:text-gray-500',
-          ].join(' ')}
-        >
-          {isRest ? 'Rest day — streak saved' : selected ? `Done — ${selected}` : 'Select workout'}
-        </span>
       </div>
     </div>
   )
