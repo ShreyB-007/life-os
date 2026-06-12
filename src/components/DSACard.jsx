@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, forwardRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayStr } from '../lib/date'
 import StreakDisplay from './StreakDisplay'
@@ -9,7 +9,7 @@ const DIFFICULTIES = [
   { key: 'hard', label: 'Hard', color: '#EF4444' },
 ]
 
-export default function DSACard({ streak, todayLog, onLog }) {
+const DSACard = forwardRef(function DSACard({ streak, todayLog, onLog }, ref) {
   const [counts, setCounts] = useState({ easy: 0, med: 0, hard: 0 })
   const [prevDone, setPrevDone] = useState(false)
   const [booped, setBooped] = useState(false)
@@ -64,6 +64,7 @@ export default function DSACard({ streak, todayLog, onLog }) {
 
   return (
     <div
+      ref={ref}
       className={[
         'relative overflow-hidden rounded-xl transition-all duration-200',
         isDone ? '' : 'card-interactive',
@@ -135,4 +136,6 @@ export default function DSACard({ streak, todayLog, onLog }) {
       </div>
     </div>
   )
-}
+})
+
+export default DSACard
