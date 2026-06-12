@@ -26,11 +26,12 @@ export default {
           100: '#F1F1F8',
           200: '#E2E2EE',
         },
-        // Semantic text tokens
-        'os-fg':        '#E8E8F0',
-        'os-secondary': '#8888A0',
-        'os-muted':     '#4A4A60',
-        // Primary accent
+        // Semantic tokens — values live in CSS variables (index.css :root / html.dark)
+        // so text-os-fg / text-os-secondary / text-os-muted adapt to theme automatically
+        'os-fg':        'var(--os-fg)',
+        'os-secondary': 'var(--os-secondary)',
+        'os-muted':     'var(--os-muted)',
+        // Primary accent (same in both themes)
         'os-indigo':    '#6366F1',
       },
       keyframes: {

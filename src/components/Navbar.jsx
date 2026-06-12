@@ -11,11 +11,12 @@ const links = [
 export default function Navbar({ dark, onToggleDark }) {
   return (
     <nav
-      className="sticky top-0 z-50 border-b border-surface-200 dark:border-void-800"
+      className="sticky top-0 z-50 border-b"
       style={{
-        backgroundColor: dark ? 'rgba(7,7,18,0.8)' : 'rgba(250,250,250,0.9)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
+        backgroundColor: dark ? 'rgba(7,7,18,0.82)' : 'rgba(245,243,238,0.88)',
+        borderColor: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)',
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
       }}
     >
       <div className="max-w-[1200px] mx-auto px-6 flex items-center justify-between h-13 overflow-x-auto">
@@ -27,10 +28,10 @@ export default function Navbar({ dark, onToggleDark }) {
               end={link.to === '/'}
               className={({ isActive }) =>
                 [
-                  'relative px-3 py-2 text-sm font-body font-medium whitespace-nowrap transition-colors duration-150',
+                  'nav-link-hover relative px-3 py-1.5 text-sm font-body font-medium whitespace-nowrap transition-colors duration-150',
                   isActive
-                    ? 'text-zinc-900 dark:text-os-fg'
-                    : 'text-zinc-400 dark:text-os-muted hover:text-zinc-700 dark:hover:text-os-secondary',
+                    ? 'text-os-fg'
+                    : 'text-os-secondary hover:text-os-fg',
                 ].join(' ')
               }
             >
@@ -38,7 +39,10 @@ export default function Navbar({ dark, onToggleDark }) {
                 <>
                   {link.label}
                   {isActive && (
-                    <span className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full bg-indigo-500 dark:bg-os-indigo" />
+                    <span
+                      className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full"
+                      style={{ backgroundColor: '#6366F1' }}
+                    />
                   )}
                 </>
               )}
@@ -48,7 +52,7 @@ export default function Navbar({ dark, onToggleDark }) {
 
         <button
           onClick={onToggleDark}
-          className="ml-4 shrink-0 p-2 rounded-lg transition-colors duration-150 text-zinc-400 dark:text-os-muted hover:text-zinc-700 dark:hover:text-os-secondary hover:bg-surface-100 dark:hover:bg-void-850"
+          className="nav-link-hover ml-4 shrink-0 p-2 rounded-lg text-os-secondary hover:text-os-fg"
           aria-label="Toggle dark mode"
         >
           <i className={`ti ti-${dark ? 'sun' : 'moon'} text-lg`} />

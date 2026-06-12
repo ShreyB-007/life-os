@@ -4,9 +4,9 @@ import { getStreakTier, getNextMilestone } from '../lib/streaks'
 const TIER_CONFIG = {
   cold: {
     label: null,
-    numberStyle: { color: '#4A4A60' },
+    numberStyle: { color: 'var(--os-muted)' },
     flameFilter: 'none',
-    flameColor: '#4A4A60',
+    flameColor: 'var(--os-muted)',
   },
   warm: {
     label: 'warm',
@@ -44,16 +44,15 @@ export default function TopBar({ overallStreak, gymStreak }) {
     <div className="flex items-start justify-between mb-8 flex-wrap gap-6">
       {/* Left: greeting + date */}
       <div>
-        <h1 className="font-display text-[28px] font-bold leading-tight text-zinc-900 dark:text-os-fg tracking-tight">
+        <h1 className="font-display text-[28px] font-bold leading-tight text-os-fg tracking-tight">
           {getGreeting()}, Shrey
         </h1>
-        <p className="text-sm font-body text-zinc-400 dark:text-os-muted mt-1 tracking-wide">{formatDate(now)}</p>
+        <p className="text-sm font-body text-os-muted mt-1 tracking-wide">{formatDate(now)}</p>
       </div>
 
       {/* Right: streak display */}
       <div className="flex flex-col items-end gap-1">
         <div className="flex items-center gap-3">
-          {/* Streak number + flame */}
           <div className="relative flex items-end gap-2">
             {tier === 'legendary' && (
               <span
@@ -83,12 +82,12 @@ export default function TopBar({ overallStreak, gymStreak }) {
           )}
         </div>
 
-        <p className="text-[11px] font-body uppercase tracking-widest text-zinc-400 dark:text-os-muted">
+        <p className="text-[11px] font-body uppercase tracking-widest text-os-muted">
           day streak
         </p>
 
         {next && (
-          <p className="text-[11px] font-body text-zinc-400 dark:text-os-muted">
+          <p className="text-[11px] font-body text-os-muted">
             {next.daysRemaining} more to {next.milestone}-day milestone
           </p>
         )}

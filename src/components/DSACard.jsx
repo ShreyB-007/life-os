@@ -67,18 +67,9 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, onLog }, ref) {
       ref={ref}
       className={[
         'relative overflow-hidden rounded-xl transition-all duration-200',
-        isDone ? '' : 'card-interactive',
+        isDone ? 'habit-card-done' : 'habit-card card-interactive',
         booped && isDone ? 'animate-boop' : '',
       ].join(' ')}
-      style={isDone ? {
-        background: 'rgba(16,185,129,0.06)',
-        border: '1px solid rgba(16,185,129,0.25)',
-        borderTop: '1px solid rgba(16,185,129,0.5)',
-        boxShadow: '0 0 20px rgba(16,185,129,0.06) inset',
-      } : {
-        background: '#0F0F1A',
-        border: '1px solid #1C1C2E',
-      }}
     >
       {/* Left accent bar */}
       <div
@@ -90,7 +81,7 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, onLog }, ref) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <i className="ti ti-code text-violet-400 text-lg" />
-            <span className="font-display font-semibold text-sm text-zinc-900 dark:text-os-fg">DSA</span>
+            <span className="font-display font-semibold text-sm text-os-fg">DSA</span>
           </div>
           <StreakDisplay count={isDone ? streak : 0} flash={booped} />
         </div>
@@ -104,22 +95,16 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, onLog }, ref) {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => adjust(key, -1)}
-                  className="w-7 h-7 rounded font-mono text-sm flex items-center justify-center transition-all duration-150"
-                  style={{ border: '1px solid #1C1C2E', color: '#8888A0' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#2E2E52'; e.currentTarget.style.background = '#141428' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#1C1C2E'; e.currentTarget.style.background = 'transparent' }}
+                  className="w-7 h-7 rounded font-mono text-sm flex items-center justify-center counter-btn"
                 >
                   −
                 </button>
-                <span className="w-6 text-center text-sm font-mono font-medium tabular-nums dark:text-os-fg">
+                <span className="w-6 text-center text-sm font-mono font-medium tabular-nums text-os-fg">
                   {counts[key]}
                 </span>
                 <button
                   onClick={() => adjust(key, 1)}
-                  className="w-7 h-7 rounded font-mono text-sm flex items-center justify-center transition-all duration-150"
-                  style={{ border: '1px solid #1C1C2E', color: '#8888A0' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#2E2E52'; e.currentTarget.style.background = '#141428' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#1C1C2E'; e.currentTarget.style.background = 'transparent' }}
+                  className="w-7 h-7 rounded font-mono text-sm flex items-center justify-center counter-btn"
                 >
                   +
                 </button>
@@ -129,7 +114,10 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, onLog }, ref) {
         </div>
 
         <div className="flex justify-end">
-          <span className="text-xs font-body" style={{ color: isDone ? '#10b981' : '#4A4A60' }}>
+          <span
+            className="text-xs font-body"
+            style={{ color: isDone ? '#10b981' : 'var(--os-muted)' }}
+          >
             {isDone ? `${counts.easy}E · ${counts.med}M · ${counts.hard}H solved` : 'Not started'}
           </span>
         </div>
