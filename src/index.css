@@ -5,9 +5,10 @@
 /* ─── Keyframes (defined globally so @layer base can reference them) ── */
 
 @keyframes cosmicBreath {
-  0%   { background-position: 0 0, 31px 43px, 0% 50%; }
-  50%  { background-position: 0 0, 31px 43px, 100% 50%; }
-  100% { background-position: 0 0, 31px 43px, 0% 50%; }
+  /* 5 layers: h-grid, v-grid, star-dots-1, star-dots-2, animated-gradient */
+  0%   { background-position: 0 0, 0 0, 0 0, 31px 43px, 0% 50%; }
+  50%  { background-position: 0 0, 0 0, 0 0, 31px 43px, 100% 50%; }
+  100% { background-position: 0 0, 0 0, 0 0, 31px 43px, 0% 50%; }
 }
 
 @keyframes lightBreath {
@@ -43,6 +44,22 @@
   0%, 100% { transform: translate(0, 0) rotate(0deg); }
   30%  { transform: translate(-15px, -22px) rotate(-4deg); }
   60%  { transform: translate(12px, -35px) rotate(7deg); }
+}
+
+@keyframes iconDrift6 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  45%  { transform: translate(-14px, -28px) rotate(-7deg); }
+}
+
+@keyframes iconDrift7 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  35%  { transform: translate(20px, -15px) rotate(12deg); }
+  70%  { transform: translate(-8px, -25px) rotate(-5deg); }
+}
+
+@keyframes iconDrift8 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  55%  { transform: translate(16px, -20px) rotate(9deg); }
 }
 
 @keyframes cosmicTextShift {
@@ -103,14 +120,16 @@ html.dark {
     font-family: 'Outfit', sans-serif;
   }
 
-  /* Dark mode: animated deep-space gradient + two-pitch star field */
+  /* Dark mode: animated deep-space gradient + fine graph-paper grid + two-pitch star field */
   html.dark {
     background-color: #050710;
     background-image:
+      linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
       radial-gradient(circle, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
       radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
       linear-gradient(-45deg, #050710, #0D1040, #120820, #0A1530, #040410, #0D1040);
-    background-size: 97px 97px, 59px 59px, 400% 400%;
+    background-size: 40px 40px, 40px 40px, 97px 97px, 59px 59px, 400% 400%;
     animation: cosmicBreath 20s ease infinite;
     color: var(--os-fg);
   }

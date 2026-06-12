@@ -12,18 +12,19 @@ const CELEBRATION_DURATION = 3000
 const RING_DURATION = 1500
 const BREATHE_SPEED = 2600            // ms per full breathe cycle
 
-// Warm amber/gold nodes + cool blue-indigo connections (neuron reference contrast)
+// Blue-white stellar nodes (Sirius / blue-giant type) + cool connections
 const DARK_THEME = {
-  nodeCenter: '255,250,225',   // near-white warm cream
-  nodeInner:  '255,190,65',    // amber
-  nodeOuter:  '215,130,20',    // burnt orange
-  lineRGB:    '110,120,240',   // cool blue-indigo — distinct from warm nodes
+  nodeCenter: '210,235,255',   // blue-white stellar core
+  nodeInner:  '130,180,255',   // steel blue corona
+  nodeOuter:  '80,120,210',    // deep blue outer atmosphere
+  lineRGB:    '110,120,240',   // cool blue-indigo connections
   lineBaseMax: 0.08,
-  glowBase:    26,             // outer glow radius (px)
-  glowVary:    11,             // breathe variation on outer glow
-  coreBase:    3.8,            // core radius
-  coreVary:    0.9,
-  celebRingRGB: '255,190,65',  // amber ring on allDone
+  glowBase:    22,             // slightly dimmer than before (was 26)
+  glowVary:    9,              // breathe variation (was 11)
+  coreBase:    3.2,            // core radius (was 3.8)
+  coreVary:    0.8,
+  celebRingRGB: '175,210,255', // blue-white ring on allDone
+  pullStrength: 0.16,          // cursor pull force (dark mode unchanged)
 }
 
 // Soft white/lavender nodes — floating in periwinkle space
@@ -38,6 +39,7 @@ const LIGHT_THEME = {
   coreBase:    3.4,
   coreVary:    0.7,
   celebRingRGB: '195,200,255', // lavender ring on allDone
+  pullStrength: 0.09,          // light mode: ~44% gentler (was 0.16)
 }
 
 function makeNodes(w, h) {
@@ -228,7 +230,7 @@ const NeuralConstellation = forwardRef(function NeuralConstellation({ allDone },
           const dy = cursor.y - n.y
           const dist = Math.hypot(dx, dy)
           if (dist > 0 && dist < CURSOR_PULL_DIST) {
-            const strength = (1 - dist / CURSOR_PULL_DIST) * CURSOR_PULL_STRENGTH
+            const strength = (1 - dist / CURSOR_PULL_DIST) * theme.pullStrength
             n.vx += (dx / dist) * strength
             n.vy += (dy / dist) * strength
           }
