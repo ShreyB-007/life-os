@@ -7,9 +7,9 @@ const TIER_LABELS = {
   legendary: 'legendary',
 }
 
-export default function TopBar({ gymStreak }) {
-  const tier = getStreakTier(gymStreak)
-  const next = getNextMilestone(gymStreak)
+export default function TopBar({ overallStreak, gymStreak }) {
+  const tier = getStreakTier(overallStreak)
+  const next = getNextMilestone(overallStreak)
   const now = new Date()
 
   return (
@@ -27,7 +27,7 @@ export default function TopBar({ gymStreak }) {
         <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-500/20 border border-amber-300 dark:border-amber-500/40 rounded-full px-3 py-1.5">
           <i className="ti ti-flame text-amber-500 dark:text-amber-400 text-base" />
           <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">
-            Day {gymStreak} streak
+            Day {overallStreak} streak
           </span>
           {tier !== 'cold' && TIER_LABELS[tier] && (
             <span className="text-[10px] font-bold uppercase tracking-wide bg-amber-100 dark:bg-amber-500/30 text-amber-800 dark:text-amber-200 rounded-full px-1.5 py-0.5">

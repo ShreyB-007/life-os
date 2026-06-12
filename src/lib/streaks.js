@@ -64,6 +64,43 @@ export function getNextMilestone(streak) {
   return { milestone: next, daysRemaining: next - streak }
 }
 
+// Overall active-day streak: gym satisfied by done=true OR is_rest_day=true OR scheduled Sunday.
+// Japanese and DSA must be done=true. Skips today if not yet complete.
+export function computeOverallStreak(gymLogs, japaneseLogs, dsaLogs) {
+  const gymMap = {}, japMap = {}, dsaMap = {}
+  for (const l of gymLogs) gymMap[l.log_date] = l
+  for (const l of japaneseLogs) japMap[l.log_date] = l
+  for (const l of dsaLogs) dsaMap[l.log_date] = l
+
+  const today = toDateStr(new Date())
+  let streak = 0
+  let cursor = new Date()
+
+  while (true) {
+    const dateStr = toDateStr(cursor)
+    const gymLog = gymMap[dateStr]
+    const gymOk = gymLog?.done === true || gymLog?.is_rest_day === true || cursor.getDay() === 0
+    const japOk = japMap[dateStr]?.done === true
+    const dsaOk = dsaMap[dateStr]?.done === true
+    const allOk = gymOk && japOk && dsaOk
+
+    if (dateStr === today && !allOk) {
+      cursor = prevDay(cursor)
+      continue
+    }
+
+    if (allOk) {
+      streak++
+      cursor = prevDay(cursor)
+      continue
+    }
+
+    break
+  }
+
+  return streak
+}
+
 // Compute per-subtask streak from allLogs for JapaneseCard
 export function computeSubtaskStreak(allLogs, subtaskKey) {
   const today = toDateStr(new Date())

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayStr } from '../lib/date'
-import { computeStreak } from '../lib/streaks'
+import { computeStreak, computeOverallStreak } from '../lib/streaks'
 import TopBar from '../components/TopBar'
 import AllDoneBanner from '../components/AllDoneBanner'
 import GymCard from '../components/GymCard'
@@ -68,6 +68,7 @@ export default function Dashboard() {
   const gymStreak = computeStreak(logs.gym, [0])
   const japaneseStreak = computeStreak(logs.japanese, [])
   const dsaStreak = computeStreak(logs.dsa, [])
+  const overallStreak = computeOverallStreak(logs.gym, logs.japanese, logs.dsa)
 
   // Derived — recomputes whenever todayLogs changes, handles un-logging correctly.
   const allDone =
@@ -77,7 +78,7 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-[1200px] mx-auto px-6 py-8">
-      <TopBar gymStreak={gymStreak} />
+      <TopBar overallStreak={overallStreak} gymStreak={gymStreak} />
 
       <AllDoneBanner visible={allDone} />
 
@@ -89,6 +90,7 @@ export default function Dashboard() {
           <GymCard
             streak={gymStreak}
             todayLog={todayLogs.gym}
+            allLogs={logs.gym}
             onLog={onLog}
           />
           <JapaneseCard

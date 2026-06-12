@@ -10,7 +10,15 @@ const WORKOUT_TYPES = [
   { key: 'Cardio', subtitle: 'Endurance' },
 ]
 
-export default function GymCard({ streak, todayLog, onLog }) {
+function getMondayStr() {
+  const today = new Date()
+  const daysToMonday = (today.getDay() + 6) % 7
+  const monday = new Date(today)
+  monday.setDate(today.getDate() - daysToMonday)
+  return monday.toISOString().slice(0, 10)
+}
+
+export default function GymCard({ streak, todayLog, allLogs = [], onLog }) {
   const [selected, setSelected] = useState(null)
   const [isRest, setIsRest] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -24,20 +32,33 @@ export default function GymCard({ streak, todayLog, onLog }) {
         setSelected(null)
       } else if (wt) {
         setSelected(wt)
+        setIsRest(false)
+      } else if (!todayLog.done) {
+        setSelected(null)
+        setIsRest(false)
       }
+    } else {
+      setSelected(null)
+      setIsRest(false)
     }
   }, [todayLog])
 
   const isDone = selected !== null || isRest
 
-  // Optimistically updates parent logs state, then persists to Supabase.
-  async function save(workoutType, restDay) {
+  // Count rest days this week (Mon–today) to enforce 2-per-week cap
+  const mondayStr = getMondayStr()
+  const weekRestCount = allLogs.filter(
+    l => l.is_rest_day && l.log_date >= mondayStr
+  ).length
+  const restLimitReached = weekRestCount >= 2
+
+  async function save(workoutType, restDay, done) {
     const logEntry = {
       habit_key: 'gym',
       log_date: todayStr(),
-      done: true,
+      done,
       is_rest_day: restDay,
-      payload: { workout_type: workoutType },
+      payload: workoutType ? { workout_type: workoutType } : {},
       logged_at: new Date().toISOString(),
     }
     onLog('gym', logEntry)
@@ -49,18 +70,26 @@ export default function GymCard({ streak, todayLog, onLog }) {
   }
 
   function selectWorkout(type) {
+    if (selected === type) {
+      // Deselect: revert to not-done
+      setSelected(null)
+      setIsRest(false)
+      save(null, false, false)
+      return
+    }
     const wasAlreadyDone = isDone
     setSelected(type)
     setIsRest(false)
-    save(type, false)
+    save(type, false, true)
     if (!wasAlreadyDone) triggerBoop()
   }
 
   function markRest() {
+    if (restLimitReached) return
     const wasAlreadyDone = isDone
     setIsRest(true)
     setSelected(null)
-    save('rest', true)
+    save('rest', true, true)
     if (!wasAlreadyDone) triggerBoop()
   }
 
@@ -108,17 +137,25 @@ export default function GymCard({ streak, todayLog, onLog }) {
       </div>
 
       <div className="flex items-center justify-between">
-        <button
-          onClick={markRest}
-          className={[
-            'text-xs px-2.5 py-1 rounded border transition-colors duration-150',
-            isRest
-              ? 'border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10'
-              : 'border-zinc-300 dark:border-gray-600 text-zinc-500 dark:text-gray-400 hover:border-zinc-400 dark:hover:border-gray-400',
-          ].join(' ')}
-        >
-          Rest day
-        </button>
+        <div className="flex flex-col items-start gap-0.5">
+          <button
+            onClick={markRest}
+            disabled={restLimitReached}
+            className={[
+              'text-xs px-2.5 py-1 rounded border transition-colors duration-150',
+              restLimitReached
+                ? 'border-zinc-200 dark:border-gray-700 text-zinc-300 dark:text-gray-600 bg-zinc-50 dark:bg-gray-800 cursor-not-allowed'
+                : isRest
+                  ? 'border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10'
+                  : 'border-zinc-300 dark:border-gray-600 text-zinc-500 dark:text-gray-400 hover:border-zinc-400 dark:hover:border-gray-400',
+            ].join(' ')}
+          >
+            {restLimitReached ? 'Rest limit reached' : 'Rest day'}
+          </button>
+          {weekRestCount === 1 && !restLimitReached && (
+            <span className="text-[10px] text-amber-500 dark:text-amber-400">1 of 2 rest days used</span>
+          )}
+        </div>
         <span
           className={[
             'text-xs',
