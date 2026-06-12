@@ -364,8 +364,8 @@ const NeuralConstellation = forwardRef(function NeuralConstellation({ allDone },
     state.prevAllDone = allDone
   }, [allDone])
 
-  // Portal to document.body — canvas at z-index 0 in root stacking context,
-  // behind cursor spotlight (1) and all content (2).
+  // Portal to document.body — canvas at z-index 2 in root stacking context,
+  // above floating icons (1), behind cursor spotlight (3) and all content (4).
   return createPortal(
     <canvas
       ref={canvasRef}
@@ -375,7 +375,7 @@ const NeuralConstellation = forwardRef(function NeuralConstellation({ allDone },
         left: 0,
         width: '100vw',
         height: '100vh',
-        zIndex: 0,
+        zIndex: 2,
         pointerEvents: 'none',
       }}
     />,

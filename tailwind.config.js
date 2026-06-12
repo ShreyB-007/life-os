@@ -81,6 +81,10 @@ export default {
           '0%':   { backgroundPosition: '-200% center' },
           '100%': { backgroundPosition: '200% center' },
         },
+        'cosmic-text-shift': {
+          '0%':   { backgroundPosition: '0% center' },
+          '100%': { backgroundPosition: '300% center' },
+        },
       },
       animation: {
         'pulse-warm':      'pulse-streak 2s ease-in-out infinite',
@@ -93,8 +97,9 @@ export default {
         float:             'float 3s ease-in-out infinite',
         'slide-up-fade':   'slide-up-fade 400ms ease-out both',
         'streak-flash':    'streak-flash 400ms ease-out',
-        'bar-shine':       'bar-shine 1.2s ease forwards',
-        'banner-shimmer':  'banner-shimmer 1.5s ease 1 forwards',
+        'bar-shine':           'bar-shine 1.2s ease forwards',
+        'banner-shimmer':      'banner-shimmer 1.5s ease 1 forwards',
+        'cosmic-text-shift':   'cosmic-text-shift 3.5s linear infinite',
       },
     },
   },

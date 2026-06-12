@@ -2,6 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Keyframes (defined globally so @layer base can reference them) ── */
+
+@keyframes cosmicBreath {
+  0%   { background-position: 0 0, 31px 43px, 0% 50%; }
+  50%  { background-position: 0 0, 31px 43px, 100% 50%; }
+  100% { background-position: 0 0, 31px 43px, 0% 50%; }
+}
+
+@keyframes lightBreath {
+  0%   { background-position: 0 0, 0% 50%; }
+  50%  { background-position: 0 0, 100% 50%; }
+  100% { background-position: 0 0, 0% 50%; }
+}
+
+@keyframes iconDrift1 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  33%  { transform: translate(18px, -25px) rotate(8deg); }
+  66%  { transform: translate(-12px, -15px) rotate(-5deg); }
+}
+
+@keyframes iconDrift2 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  40%  { transform: translate(-20px, -30px) rotate(-6deg); }
+  70%  { transform: translate(10px, -20px) rotate(4deg); }
+}
+
+@keyframes iconDrift3 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  25%  { transform: translate(15px, -18px) rotate(10deg); }
+  75%  { transform: translate(-8px, -28px) rotate(-8deg); }
+}
+
+@keyframes iconDrift4 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50%  { transform: translate(22px, -20px) rotate(6deg); }
+}
+
+@keyframes iconDrift5 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  30%  { transform: translate(-15px, -22px) rotate(-4deg); }
+  60%  { transform: translate(12px, -35px) rotate(7deg); }
+}
+
+@keyframes cosmicTextShift {
+  0%   { background-position: 0% center; }
+  100% { background-position: 300% center; }
+}
+
 /* ─── Semantic color tokens ───────────────────────────── */
 :root {
   --os-fg:        #17172A;
@@ -9,18 +57,18 @@
   --os-muted:     #9090B0;
   --os-indigo:    #6366F1;
 
-  /* Card surfaces */
-  --card-bg:      rgba(255, 255, 255, 0.92);
-  --card-border:  rgba(0, 0, 0, 0.07);
-  --card-shadow:  0 1px 12px rgba(0, 0, 0, 0.07), 0 0 0 1px rgba(0, 0, 0, 0.04);
-  --card-blur:    none;
+  /* Card surfaces — light: periwinkle-tinted glass */
+  --card-bg:      rgba(240, 240, 255, 0.70);
+  --card-border:  rgba(180, 180, 220, 0.25);
+  --card-shadow:  0 2px 16px rgba(100, 100, 180, 0.08), 0 0 0 1px rgba(180, 180, 220, 0.15);
+  --card-blur:    blur(16px);
 
   /* Progress bar track */
   --track-bg:     rgba(0, 0, 0, 0.07);
 
   /* Counters / small inputs */
-  --input-border: rgba(0, 0, 0, 0.1);
-  --input-hover-bg: rgba(99, 102, 241, 0.06);
+  --input-border:       rgba(0, 0, 0, 0.10);
+  --input-hover-bg:     rgba(99, 102, 241, 0.06);
   --input-hover-border: rgba(99, 102, 241, 0.25);
 }
 
@@ -29,36 +77,41 @@ html.dark {
   --os-secondary: #8888A0;
   --os-muted:     #6A6A88;
 
-  --card-bg:      rgba(15, 15, 26, 0.55);
-  --card-border:  rgba(255, 255, 255, 0.06);
+  /* Dark: genuine glassmorphism — galaxy visible through cards */
+  --card-bg:      rgba(8, 10, 24, 0.28);
+  --card-border:  rgba(255, 255, 255, 0.07);
   --card-shadow:  none;
-  --card-blur:    blur(16px);
+  --card-blur:    blur(20px);
 
-  --track-bg:     #1C1C2E;
+  --track-bg:     rgba(255, 255, 255, 0.06);
 
-  --input-border: #1C1C2E;
-  --input-hover-bg: #141428;
-  --input-hover-border: #2E2E52;
+  --input-border:       rgba(255, 255, 255, 0.09);
+  --input-hover-bg:     rgba(99, 102, 241, 0.10);
+  --input-hover-border: rgba(99, 102, 241, 0.30);
 }
 
 @layer base {
+  /* Light mode: soft animated periwinkle/lavender space (Image 2 reference) */
   html {
-    /* Light mode: warm off-white + faint indigo dot-grid */
-    background-color: #F5F3EE;
-    background-image: radial-gradient(circle, rgba(99, 102, 241, 0.10) 1.5px, transparent 1.5px);
-    background-size: 28px 28px;
+    background-color: #E8EEFF;
+    background-image:
+      radial-gradient(circle, rgba(99, 102, 241, 0.12) 1.5px, transparent 1.5px),
+      linear-gradient(-45deg, #EEF0FF, #D8D0FF, #E8EEFF, #C8D8FF, #F0EEFF, #D8D0FF);
+    background-size: 28px 28px, 400% 400%;
+    animation: lightBreath 20s ease infinite;
     color: var(--os-fg);
     font-family: 'Outfit', sans-serif;
   }
 
+  /* Dark mode: animated deep-space gradient + two-pitch star field */
   html.dark {
-    /* Deep space: near-black + two-pitch star-dot layers */
-    background-color: #070712;
+    background-color: #050710;
     background-image:
       radial-gradient(circle, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
-      radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-    background-size: 97px 97px, 59px 59px;
-    background-position: 0 0, 31px 43px;
+      radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(-45deg, #050710, #0D1040, #120820, #0A1530, #040410, #0D1040);
+    background-size: 97px 97px, 59px 59px, 400% 400%;
+    animation: cosmicBreath 20s ease infinite;
     color: var(--os-fg);
   }
 
@@ -74,7 +127,6 @@ html.dark {
 
 /* ─── Card system ────────────────────────────────────── */
 
-/* Base habit card: adapts to both themes */
 .habit-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
@@ -85,38 +137,49 @@ html.dark {
 
 /* Done / completed state */
 .habit-card-done {
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  border-top-color: rgba(16, 185, 129, 0.6);
-  box-shadow: 0 2px 20px rgba(16, 185, 129, 0.1);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  background: rgba(16, 185, 129, 0.10);
+  border: 1px solid rgba(16, 185, 129, 0.30);
+  border-top-color: rgba(16, 185, 129, 0.60);
+  box-shadow: 0 2px 20px rgba(16, 185, 129, 0.10);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 html.dark .habit-card-done {
-  background: rgba(16, 185, 129, 0.06);
-  border: 1px solid rgba(16, 185, 129, 0.25);
-  border-top-color: rgba(16, 185, 129, 0.5);
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.06) inset;
+  background: rgba(16, 185, 129, 0.07);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  border-top-color: rgba(16, 185, 129, 0.45);
+  box-shadow: 0 0 28px rgba(16, 185, 129, 0.07) inset;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
-/* Interactive card hover — both themes */
+/* Interactive card hover — 300ms bloom */
 .card-interactive {
-  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+  transition: border-color 300ms ease, box-shadow 300ms ease, transform 300ms ease;
 }
 
-/* Light mode hover */
+/* Default hover (overridden by per-habit classes) */
 .card-interactive:hover {
-  transform: translateY(-2px);
-  border-color: rgba(99, 102, 241, 0.25) !important;
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.10), 0 0 0 1px rgba(99, 102, 241, 0.12) !important;
+  transform: translateY(-3px);
+  border-color: rgba(99, 102, 241, 0.28) !important;
+  box-shadow: 0 6px 28px rgba(99, 102, 241, 0.12), 0 0 0 1px rgba(99, 102, 241, 0.15) !important;
 }
 
-/* Dark mode hover (overrides light) */
-html.dark .card-interactive:hover {
-  transform: translateY(-2px);
-  border-color: rgba(99, 102, 241, 0.2) !important;
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.12), 0 4px 24px rgba(99, 102, 241, 0.08) !important;
+/* ─── Per-habit hover glow colors ────────────────────── */
+.habit-gym.card-interactive:hover {
+  border-color: rgba(99, 102, 241, 0.35) !important;
+  box-shadow: 0 6px 32px rgba(99, 102, 241, 0.15), 0 0 0 1px rgba(99, 102, 241, 0.18) !important;
+}
+
+.habit-japanese.card-interactive:hover {
+  border-color: rgba(139, 92, 246, 0.35) !important;
+  box-shadow: 0 6px 32px rgba(139, 92, 246, 0.15), 0 0 0 1px rgba(139, 92, 246, 0.18) !important;
+}
+
+.habit-dsa.card-interactive:hover {
+  border-color: rgba(6, 182, 212, 0.35) !important;
+  box-shadow: 0 6px 32px rgba(6, 182, 212, 0.15), 0 0 0 1px rgba(6, 182, 212, 0.18) !important;
 }
 
 /* ─── Card accent bar ────────────────────────────────── */
@@ -135,14 +198,15 @@ html.dark .card-interactive:hover {
   border: 1px solid var(--input-border);
   color: var(--os-secondary);
   background: transparent;
-  transition: all 150ms ease;
+  transition: all 200ms ease;
 }
 
 .gym-type-btn:hover {
   background: var(--input-hover-bg);
   border-color: var(--input-hover-border);
-  transform: translateY(-1px);
+  transform: translateY(-1px) scale(1.02);
   color: var(--os-fg);
+  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.20);
 }
 
 /* Rest day button */
@@ -154,11 +218,11 @@ html.dark .card-interactive:hover {
 }
 
 html.dark .gym-rest-btn {
-  border-color: #2E2E52;
+  border-color: rgba(255, 255, 255, 0.09);
 }
 
 .gym-rest-btn.is-active {
-  border-color: rgba(99, 102, 241, 0.4);
+  border-color: rgba(99, 102, 241, 0.40);
   color: #818CF8;
   background: rgba(99, 102, 241, 0.08);
 }
@@ -188,11 +252,37 @@ html.dark .gym-rest-btn {
   background: var(--track-bg);
 }
 
-/* ─── Navbar link pill hover ─────────────────────────── */
+/* ─── Navbar link — L→R color wash on hover ─────────── */
 .nav-link-hover {
-  position: relative;
-  transition: color 150ms ease, background-color 150ms ease;
   border-radius: 6px;
+}
+
+.nav-link-wash {
+  background: linear-gradient(90deg, var(--os-fg) 0%, var(--os-fg) 50%, var(--os-secondary) 50%, var(--os-secondary) 100%);
+  background-size: 201%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transition: background-position 280ms ease, box-shadow 150ms ease;
+  position: relative;
+}
+
+.nav-link-wash:hover {
+  background-position: 0% 0;
+}
+
+.nav-link-wash.is-active {
+  background-position: 0% 0;
+}
+
+.nav-link-wash:hover {
+  box-shadow: none;
+}
+
+/* Nav hover background pill */
+.nav-link-hover {
+  transition: background-color 150ms ease;
 }
 
 .nav-link-hover:hover {
@@ -218,14 +308,24 @@ html.dark .nav-link-hover:hover {
   background-clip: text;
 }
 
-/* Legendary → violet/mythic */
+/* Legendary → animated indigo→violet→cyan */
 .text-gradient-legendary {
-  background: linear-gradient(135deg, #c4b5fd 0%, #8b5cf6 35%, #a78bfa 65%, #7c3aed 100%);
-  background-size: 200% auto;
+  background: linear-gradient(90deg, #6366F1, #8B5CF6, #06B6D4, #8B5CF6, #6366F1);
+  background-size: 300% auto;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  animation: shimmer 2.5s linear infinite;
+  animation: cosmicTextShift 3.5s linear infinite;
+}
+
+/* AllDoneBanner / cosmic celebration text */
+.text-gradient-cosmic {
+  background: linear-gradient(90deg, #6366F1, #8B5CF6, #06B6D4, #10B981, #8B5CF6, #6366F1);
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: cosmicTextShift 4s linear infinite;
 }
 
 /* ─── Progress bar shine (one-shot on mount) ─────────── */

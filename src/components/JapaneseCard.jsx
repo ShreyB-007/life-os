@@ -55,7 +55,7 @@ const JapaneseCard = forwardRef(function JapaneseCard({ streak, todayLog, allLog
     <div
       ref={ref}
       className={[
-        'relative overflow-hidden rounded-xl transition-all duration-200',
+        'relative overflow-hidden rounded-xl transition-all duration-200 habit-japanese',
         isDone ? 'habit-card-done' : 'habit-card card-interactive',
         booped && isDone ? 'animate-boop' : '',
       ].join(' ')}
@@ -63,13 +63,13 @@ const JapaneseCard = forwardRef(function JapaneseCard({ streak, todayLog, allLog
       {/* Left accent bar */}
       <div
         className="card-accent-bar"
-        style={{ backgroundColor: isDone ? '#10b981' : '#6366F1' }}
+        style={{ backgroundColor: isDone ? '#10b981' : '#8B5CF6' }}
       />
 
       <div className="p-4 pl-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <i className="ti ti-language text-indigo-400 text-lg" />
+            <i className="ti ti-language text-lg" style={{ color: '#8B5CF6' }} />
             <span className="font-display font-semibold text-sm text-os-fg">Japanese</span>
           </div>
           <StreakDisplay count={streak} flash={booped} />

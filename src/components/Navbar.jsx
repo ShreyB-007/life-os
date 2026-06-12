@@ -28,10 +28,8 @@ export default function Navbar({ dark, onToggleDark }) {
               end={link.to === '/'}
               className={({ isActive }) =>
                 [
-                  'nav-link-hover relative px-3 py-1.5 text-sm font-body font-medium whitespace-nowrap transition-colors duration-150',
-                  isActive
-                    ? 'text-os-fg'
-                    : 'text-os-secondary hover:text-os-fg',
+                  'nav-link-hover nav-link-wash relative px-3 py-1.5 text-sm font-body font-medium whitespace-nowrap',
+                  isActive ? 'is-active' : '',
                 ].join(' ')
               }
             >

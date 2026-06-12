@@ -96,7 +96,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     <div
       ref={ref}
       className={[
-        'relative overflow-hidden rounded-xl transition-all duration-200',
+        'relative overflow-hidden rounded-xl transition-all duration-200 habit-gym',
         isDone ? 'habit-card-done' : 'habit-card card-interactive',
         booped && isDone ? 'animate-boop' : '',
       ].join(' ')}
@@ -104,13 +104,13 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
       {/* Left accent bar */}
       <div
         className="card-accent-bar"
-        style={{ backgroundColor: isDone ? '#10b981' : '#F59E0B' }}
+        style={{ backgroundColor: isDone ? '#10b981' : '#6366F1' }}
       />
 
       <div className="p-4 pl-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <i className="ti ti-barbell text-amber-500 text-lg" />
+            <i className="ti ti-barbell text-lg" style={{ color: '#6366F1' }} />
             <span className="font-display font-semibold text-sm text-os-fg">Gym</span>
           </div>
           <StreakDisplay count={streak} flash={booped} />
@@ -128,9 +128,9 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
                   active ? '' : 'gym-type-btn',
                 ].join(' ')}
                 style={active ? {
-                  background: 'rgba(245,158,11,0.1)',
-                  border: '1px solid rgba(245,158,11,0.4)',
-                  color: '#F59E0B',
+                  background: 'rgba(99,102,241,0.12)',
+                  border: '1px solid rgba(99,102,241,0.45)',
+                  color: '#818CF8',
                   transition: 'all 150ms ease',
                 } : undefined}
               >

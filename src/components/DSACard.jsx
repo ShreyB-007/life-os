@@ -66,7 +66,7 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, onLog }, ref) {
     <div
       ref={ref}
       className={[
-        'relative overflow-hidden rounded-xl transition-all duration-200',
+        'relative overflow-hidden rounded-xl transition-all duration-200 habit-dsa',
         isDone ? 'habit-card-done' : 'habit-card card-interactive',
         booped && isDone ? 'animate-boop' : '',
       ].join(' ')}
@@ -74,13 +74,13 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, onLog }, ref) {
       {/* Left accent bar */}
       <div
         className="card-accent-bar"
-        style={{ backgroundColor: isDone ? '#10b981' : '#8B5CF6' }}
+        style={{ backgroundColor: isDone ? '#10b981' : '#06B6D4' }}
       />
 
       <div className="p-4 pl-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <i className="ti ti-code text-violet-400 text-lg" />
+            <i className="ti ti-code text-lg" style={{ color: '#06B6D4' }} />
             <span className="font-display font-semibold text-sm text-os-fg">DSA</span>
           </div>
           <StreakDisplay count={isDone ? streak : 0} flash={booped} />

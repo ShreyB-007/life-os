@@ -6,6 +6,7 @@ import Goals from './pages/Goals'
 import Masters from './pages/Masters'
 import Digest from './pages/Digest'
 import Review from './pages/Review'
+import FloatingIcons from './components/FloatingIcons'
 
 export default function App() {
   const [dark, setDark] = useState(() => {
@@ -34,19 +35,22 @@ export default function App() {
   }, [])
 
   return (
-    <div className="relative min-h-screen font-body bg-surface-50 dark:bg-void-950 text-zinc-900 dark:text-os-fg transition-colors duration-200">
+    <div className="relative min-h-screen font-body text-zinc-900 dark:text-os-fg transition-colors duration-200">
 
-      {/* Cursor spotlight — follows mouse, dark mode atmospheric */}
+      {/* Floating background icons (z=1) — behind constellation canvas (z=2) */}
+      <FloatingIcons />
+
+      {/* Cursor spotlight (z=3) — follows mouse, dark mode atmospheric */}
       <div
         className="fixed inset-0 pointer-events-none hidden dark:block"
         style={{
-          zIndex: 1,
+          zIndex: 3,
           background: 'radial-gradient(500px circle at var(--cursor-x, 50%) var(--cursor-y, 50%), rgba(99,102,241,0.07), transparent 40%)',
         }}
       />
 
-      {/* All content above the background effects */}
-      <div className="relative" style={{ zIndex: 2 }}>
+      {/* All content (z=4) above all background layers */}
+      <div className="relative" style={{ zIndex: 4 }}>
         <Navbar dark={dark} onToggleDark={() => setDark(d => !d)} />
         <Routes>
           <Route path="/" element={<Dashboard />} />

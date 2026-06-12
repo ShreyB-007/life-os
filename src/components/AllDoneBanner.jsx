@@ -15,7 +15,7 @@ export default function AllDoneBanner({ visible }) {
       <div className="relative px-6 py-3.5 text-center">
         <div className="flex items-center justify-center gap-2.5">
           <i className="ti ti-lock text-emerald-400 text-base" />
-          <span className="font-display font-semibold text-sm tracking-wide text-emerald-300">
+          <span className="font-display font-semibold text-sm tracking-wide text-gradient-cosmic">
             All habits done — you're locked in
           </span>
           <i className="ti ti-lock text-emerald-400 text-base" />
