@@ -2,16 +2,64 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Semantic color tokens ───────────────────────────── */
+:root {
+  --os-fg:        #17172A;
+  --os-secondary: #4A4A70;
+  --os-muted:     #9090B0;
+  --os-indigo:    #6366F1;
+
+  /* Card surfaces */
+  --card-bg:      rgba(255, 255, 255, 0.92);
+  --card-border:  rgba(0, 0, 0, 0.07);
+  --card-shadow:  0 1px 12px rgba(0, 0, 0, 0.07), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --card-blur:    none;
+
+  /* Progress bar track */
+  --track-bg:     rgba(0, 0, 0, 0.07);
+
+  /* Counters / small inputs */
+  --input-border: rgba(0, 0, 0, 0.1);
+  --input-hover-bg: rgba(99, 102, 241, 0.06);
+  --input-hover-border: rgba(99, 102, 241, 0.25);
+}
+
+html.dark {
+  --os-fg:        #E8E8F0;
+  --os-secondary: #8888A0;
+  --os-muted:     #6A6A88;
+
+  --card-bg:      rgba(15, 15, 26, 0.55);
+  --card-border:  rgba(255, 255, 255, 0.06);
+  --card-shadow:  none;
+  --card-blur:    blur(16px);
+
+  --track-bg:     #1C1C2E;
+
+  --input-border: #1C1C2E;
+  --input-hover-bg: #141428;
+  --input-hover-border: #2E2E52;
+}
+
 @layer base {
   html {
-    background-color: #FAFAFA;
-    color: #18181b;
+    /* Light mode: warm off-white + faint indigo dot-grid */
+    background-color: #F5F3EE;
+    background-image: radial-gradient(circle, rgba(99, 102, 241, 0.10) 1.5px, transparent 1.5px);
+    background-size: 28px 28px;
+    color: var(--os-fg);
     font-family: 'Outfit', sans-serif;
   }
 
   html.dark {
+    /* Deep space: near-black + two-pitch star-dot layers */
     background-color: #070712;
-    color: #E8E8F0;
+    background-image:
+      radial-gradient(circle, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+      radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 97px 97px, 59px 59px;
+    background-position: 0 0, 31px 43px;
+    color: var(--os-fg);
   }
 
   * {
@@ -25,13 +73,50 @@
 }
 
 /* ─── Card system ────────────────────────────────────── */
+
+/* Base habit card: adapts to both themes */
+.habit-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
+}
+
+/* Done / completed state */
+.habit-card-done {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-top-color: rgba(16, 185, 129, 0.6);
+  box-shadow: 0 2px 20px rgba(16, 185, 129, 0.1);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html.dark .habit-card-done {
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-top-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.06) inset;
+}
+
+/* Interactive card hover — both themes */
 .card-interactive {
   transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
 }
 
+/* Light mode hover */
+.card-interactive:hover {
+  transform: translateY(-2px);
+  border-color: rgba(99, 102, 241, 0.25) !important;
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.10), 0 0 0 1px rgba(99, 102, 241, 0.12) !important;
+}
+
+/* Dark mode hover (overrides light) */
 html.dark .card-interactive:hover {
+  transform: translateY(-2px);
   border-color: rgba(99, 102, 241, 0.2) !important;
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.12), 0 4px 24px rgba(99, 102, 241, 0.08);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.12), 0 4px 24px rgba(99, 102, 241, 0.08) !important;
 }
 
 /* ─── Card accent bar ────────────────────────────────── */
@@ -43,6 +128,79 @@ html.dark .card-interactive:hover {
   width: 3px;
   border-radius: 3px 0 0 3px;
   transition: background-color 300ms ease;
+}
+
+/* ─── Workout type buttons (GymCard) ─────────────────── */
+.gym-type-btn {
+  border: 1px solid var(--input-border);
+  color: var(--os-secondary);
+  background: transparent;
+  transition: all 150ms ease;
+}
+
+.gym-type-btn:hover {
+  background: var(--input-hover-bg);
+  border-color: var(--input-hover-border);
+  transform: translateY(-1px);
+  color: var(--os-fg);
+}
+
+/* Rest day button */
+.gym-rest-btn {
+  border: 1px solid var(--input-border);
+  color: var(--os-secondary);
+  background: transparent;
+  transition: all 150ms ease;
+}
+
+html.dark .gym-rest-btn {
+  border-color: #2E2E52;
+}
+
+.gym-rest-btn.is-active {
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #818CF8;
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.gym-rest-btn.is-disabled {
+  border-color: var(--input-border);
+  color: var(--os-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ─── Counter buttons (DSACard) ──────────────────────── */
+.counter-btn {
+  border: 1px solid var(--input-border);
+  color: var(--os-secondary);
+  background: transparent;
+  transition: all 150ms ease;
+}
+
+.counter-btn:hover {
+  background: var(--input-hover-bg);
+  border-color: var(--input-hover-border);
+}
+
+/* ─── Goal row progress track ────────────────────────── */
+.progress-track {
+  background: var(--track-bg);
+}
+
+/* ─── Navbar link pill hover ─────────────────────────── */
+.nav-link-hover {
+  position: relative;
+  transition: color 150ms ease, background-color 150ms ease;
+  border-radius: 6px;
+}
+
+.nav-link-hover:hover {
+  background: rgba(99, 102, 241, 0.07);
+}
+
+html.dark .nav-link-hover:hover {
+  background: rgba(99, 102, 241, 0.08);
 }
 
 /* ─── Gradient text ──────────────────────────────────── */
@@ -74,7 +232,7 @@ html.dark .card-interactive:hover {
 .bar-shine {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.22) 50%, transparent 100%);
   background-size: 300% 100%;
   background-position: -100%;
   animation: bar-shine 1.2s ease forwards;
@@ -86,7 +244,7 @@ html.dark .card-interactive:hover {
 .banner-shimmer-once {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 50%, transparent 100%);
   background-size: 300% 100%;
   background-position: -200%;
   animation: banner-shimmer 1.5s ease 350ms 1 forwards;

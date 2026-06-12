@@ -97,18 +97,9 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
       ref={ref}
       className={[
         'relative overflow-hidden rounded-xl transition-all duration-200',
-        isDone ? '' : 'card-interactive',
+        isDone ? 'habit-card-done' : 'habit-card card-interactive',
         booped && isDone ? 'animate-boop' : '',
       ].join(' ')}
-      style={isDone ? {
-        background: 'rgba(16,185,129,0.06)',
-        border: '1px solid rgba(16,185,129,0.25)',
-        borderTop: '1px solid rgba(16,185,129,0.5)',
-        boxShadow: '0 0 20px rgba(16,185,129,0.06) inset',
-      } : {
-        background: '#0F0F1A',
-        border: '1px solid #1C1C2E',
-      }}
     >
       {/* Left accent bar */}
       <div
@@ -119,8 +110,8 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
       <div className="p-4 pl-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <i className="ti ti-barbell text-amber-500 dark:text-amber-400 text-lg" />
-            <span className="font-display font-semibold text-sm text-zinc-900 dark:text-os-fg">Gym</span>
+            <i className="ti ti-barbell text-amber-500 text-lg" />
+            <span className="font-display font-semibold text-sm text-os-fg">Gym</span>
           </div>
           <StreakDisplay count={streak} flash={booped} />
         </div>
@@ -132,31 +123,19 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
               <button
                 key={key}
                 onClick={() => selectWorkout(key)}
-                className="flex flex-col items-start px-3 py-2.5 rounded-lg text-left transition-all duration-150"
+                className={[
+                  'flex flex-col items-start px-3 py-2.5 rounded-lg text-left',
+                  active ? '' : 'gym-type-btn',
+                ].join(' ')}
                 style={active ? {
                   background: 'rgba(245,158,11,0.1)',
                   border: '1px solid rgba(245,158,11,0.4)',
                   color: '#F59E0B',
-                } : {
-                  background: 'transparent',
-                  border: '1px solid #1C1C2E',
-                  color: '#8888A0',
-                }}
-                onMouseEnter={e => {
-                  if (!active) {
-                    e.currentTarget.style.background = '#141428'
-                    e.currentTarget.style.borderColor = '#2E2E52'
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!active) {
-                    e.currentTarget.style.background = 'transparent'
-                    e.currentTarget.style.borderColor = '#1C1C2E'
-                  }
-                }}
+                  transition: 'all 150ms ease',
+                } : undefined}
               >
                 <span className="text-sm font-body font-medium">{key}</span>
-                <span className="text-[11px] font-body mt-0.5" style={{ color: '#4A4A60' }}>{subtitle}</span>
+                <span className="text-[11px] font-body mt-0.5 text-os-muted">{subtitle}</span>
               </button>
             )
           })}
@@ -167,19 +146,10 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
             <button
               onClick={markRest}
               disabled={restLimitReached}
-              className="text-xs font-body px-2.5 py-1 rounded transition-colors duration-150"
-              style={restLimitReached ? {
-                border: '1px solid #1C1C2E',
-                color: '#4A4A60',
-                cursor: 'not-allowed',
-              } : isRest ? {
-                border: '1px solid rgba(99,102,241,0.4)',
-                color: '#818CF8',
-                background: 'rgba(99,102,241,0.08)',
-              } : {
-                border: '1px solid #2E2E52',
-                color: '#8888A0',
-              }}
+              className={[
+                'text-xs font-body px-2.5 py-1 rounded gym-rest-btn',
+                restLimitReached ? 'is-disabled' : isRest ? 'is-active' : '',
+              ].join(' ')}
             >
               {restLimitReached ? 'Rest limit reached' : 'Rest day'}
             </button>
@@ -189,7 +159,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
           </div>
           <span
             className="text-xs font-body"
-            style={{ color: isDone ? '#10b981' : '#4A4A60' }}
+            style={{ color: isDone ? '#10b981' : 'var(--os-muted)' }}
           >
             {isRest ? 'Rest day — streak saved' : selected ? `Done — ${selected}` : 'Select workout'}
           </span>

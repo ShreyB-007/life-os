@@ -56,18 +56,9 @@ const JapaneseCard = forwardRef(function JapaneseCard({ streak, todayLog, allLog
       ref={ref}
       className={[
         'relative overflow-hidden rounded-xl transition-all duration-200',
-        isDone ? '' : 'card-interactive',
+        isDone ? 'habit-card-done' : 'habit-card card-interactive',
         booped && isDone ? 'animate-boop' : '',
       ].join(' ')}
-      style={isDone ? {
-        background: 'rgba(16,185,129,0.06)',
-        border: '1px solid rgba(16,185,129,0.25)',
-        borderTop: '1px solid rgba(16,185,129,0.5)',
-        boxShadow: '0 0 20px rgba(16,185,129,0.06) inset',
-      } : {
-        background: '#0F0F1A',
-        border: '1px solid #1C1C2E',
-      }}
     >
       {/* Left accent bar */}
       <div
@@ -79,7 +70,7 @@ const JapaneseCard = forwardRef(function JapaneseCard({ streak, todayLog, allLog
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <i className="ti ti-language text-indigo-400 text-lg" />
-            <span className="font-display font-semibold text-sm text-zinc-900 dark:text-os-fg">Japanese</span>
+            <span className="font-display font-semibold text-sm text-os-fg">Japanese</span>
           </div>
           <StreakDisplay count={streak} flash={booped} />
         </div>
@@ -98,12 +89,15 @@ const JapaneseCard = forwardRef(function JapaneseCard({ streak, todayLog, allLog
                   />
                   <span
                     className="text-sm font-body transition-colors duration-150"
-                    style={{ color: checked[key] ? '#4A4A60' : '#8888A0', textDecoration: checked[key] ? 'line-through' : 'none' }}
+                    style={{
+                      color: checked[key] ? 'var(--os-muted)' : 'var(--os-secondary)',
+                      textDecoration: checked[key] ? 'line-through' : 'none',
+                    }}
                   >
                     {label}
                   </span>
                 </label>
-                <div className="flex items-center gap-1 text-xs" style={{ color: '#4A4A60' }}>
+                <div className="flex items-center gap-1 text-xs text-os-muted">
                   {subStreak > 0 ? (
                     <>
                       <i className="ti ti-flame text-xs" style={{ color: '#F59E0B' }} />
@@ -119,7 +113,10 @@ const JapaneseCard = forwardRef(function JapaneseCard({ streak, todayLog, allLog
         </div>
 
         <div className="flex justify-end">
-          <span className="text-xs font-body" style={{ color: isDone ? '#10b981' : '#4A4A60' }}>
+          <span
+            className="text-xs font-body"
+            style={{ color: isDone ? '#10b981' : 'var(--os-muted)' }}
+          >
             {doneCount} of 3 done
           </span>
         </div>
