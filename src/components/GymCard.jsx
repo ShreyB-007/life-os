@@ -1,6 +1,7 @@
-import { useState, useEffect, forwardRef } from 'react'
+import { useState, useEffect, useRef, forwardRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayStr } from '../lib/date'
+import { getLocalDateString } from '../lib/dateUtils'
 import StreakDisplay from './StreakDisplay'
 import WorkoutDrawer from './WorkoutDrawer'
 import HistoryDrawer from './HistoryDrawer'
@@ -17,18 +18,20 @@ function getMondayStr() {
   const daysToMonday = (today.getDay() + 6) % 7
   const monday = new Date(today)
   monday.setDate(today.getDate() - daysToMonday)
-  return monday.toISOString().slice(0, 10)
+  return getLocalDateString(monday)
 }
 
 const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], onLog }, ref) {
-  const [selected, setSelected]               = useState(null)
-  const [isRest, setIsRest]                   = useState(false)
-  const [saving, setSaving]                   = useState(false)
-  const [booped, setBooped]                   = useState(false)
-  const [drawerOpen, setDrawerOpen]           = useState(false)
+  const [selected, setSelected]                  = useState(null)
+  const [isRest, setIsRest]                      = useState(false)
+  const [saving, setSaving]                      = useState(false)
+  const [booped, setBooped]                      = useState(false)
+  const [drawerOpen, setDrawerOpen]              = useState(false)
   const [drawerWorkoutType, setDrawerWorkoutType] = useState(null)
-  const [drawerFromType, setDrawerFromType]   = useState(null)
-  const [historyOpen, setHistoryOpen]         = useState(false)
+  const [drawerFromType, setDrawerFromType]      = useState(null)
+  const [historyOpen, setHistoryOpen]            = useState(false)
+  // Fix 4: track whether any exercises have been logged for today's selected type
+  const [hasExerciseLogs, setHasExerciseLogs]    = useState(false)
 
   useEffect(() => {
     if (todayLog) {
@@ -49,11 +52,32 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     }
   }, [todayLog])
 
+  // Fix 4: check for exercise logs whenever selected type changes
+  useEffect(() => {
+    if (!selected) { setHasExerciseLogs(false); return }
+    let cancelled = false
+    checkExerciseLogs(selected).then(has => { if (!cancelled) setHasExerciseLogs(has) })
+    return () => { cancelled = true }
+  }, [selected])
+
   const isDone = selected !== null || isRest
 
   const mondayStr = getMondayStr()
   const weekRestCount = allLogs.filter(l => l.is_rest_day && l.log_date >= mondayStr).length
   const restLimitReached = weekRestCount >= 2
+
+  async function checkExerciseLogs(type) {
+    if (!type) return false
+    const today = todayStr()
+    const { data: exs } = await supabase
+      .from('exercises').select('id').contains('workout_type_tags', [type])
+    if (!exs?.length) return false
+    const { data: logs } = await supabase
+      .from('exercise_logs').select('id')
+      .in('exercise_id', exs.map(e => e.id))
+      .eq('log_date', today).limit(1)
+    return (logs?.length || 0) > 0
+  }
 
   async function save(workoutType, restDay, done) {
     const logEntry = {
@@ -71,16 +95,19 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
   }
 
   function selectWorkout(type) {
+    // Fix 4: if exercises are logged for current type, block switching to another type
+    if (hasExerciseLogs && selected !== null && type !== selected) return
+
     if (selected === type) {
-      // Re-tap active type: just open the drawer; it has "Delete today's session" inside
       setDrawerWorkoutType(type)
       setDrawerFromType(null)
       setDrawerOpen(true)
       return
     }
 
-    // Switching from one type to another — pass previous type so drawer can offer transfer
-    const fromType = (isDone && !isRest) ? selected : null
+    // Fix 5: derive fromType from todayLog prop directly — avoids any stale state closure
+    const currentType = todayLog?.payload?.workout_type
+    const fromType = (isDone && !isRest && currentType && currentType !== 'rest') ? currentType : null
     doSelect(type, fromType)
   }
 
@@ -98,12 +125,19 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
   function handleDeleteSession() {
     setSelected(null)
     setIsRest(false)
+    setHasExerciseLogs(false)
     save(null, false, false)
     setDrawerOpen(false)
     setDrawerFromType(null)
   }
 
+  // Fix 3: second tap on rest day deselects it
   function markRest() {
+    if (isRest) {
+      setIsRest(false)
+      save(null, false, false)
+      return
+    }
     if (restLimitReached) return
     const wasAlreadyDone = isDone
     setIsRest(true)
@@ -121,6 +155,13 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     setDrawerWorkoutType(selected)
     setDrawerFromType(null)
     setDrawerOpen(true)
+  }
+
+  function handleDrawerClose() {
+    setDrawerOpen(false)
+    setDrawerFromType(null)
+    // Fix 4: re-check exercise logs after drawer closes (user may have just logged)
+    if (selected) checkExerciseLogs(selected).then(setHasExerciseLogs)
   }
 
   return (
@@ -147,13 +188,16 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
           <div className="grid grid-cols-2 gap-2 mb-4">
             {WORKOUT_TYPES.map(({ key, subtitle }) => {
               const active = selected === key
+              // Fix 4: disable other types once exercises are logged under selected type
+              const locked = hasExerciseLogs && selected !== null && key !== selected
               return (
                 <button
                   key={key}
                   onClick={() => selectWorkout(key)}
+                  title={locked ? `Switch to ${key} — transfer or delete today's session first` : undefined}
                   className={[
                     'flex flex-col items-start px-3 py-2.5 rounded-lg text-left transition-all',
-                    active ? '' : 'gym-type-btn',
+                    active ? '' : locked ? 'opacity-40 cursor-not-allowed' : 'gym-type-btn',
                   ].join(' ')}
                   style={active ? {
                     background: 'rgba(99,102,241,0.12)',
@@ -181,13 +225,13 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
               <div className="flex flex-col items-start gap-0.5">
                 <button
                   onClick={markRest}
-                  disabled={restLimitReached}
+                  disabled={restLimitReached && !isRest}
                   className={[
                     'text-xs font-body px-2.5 py-1 rounded gym-rest-btn',
-                    restLimitReached ? 'is-disabled' : isRest ? 'is-active' : '',
+                    restLimitReached && !isRest ? 'is-disabled' : isRest ? 'is-active' : '',
                   ].join(' ')}
                 >
-                  {restLimitReached ? 'Rest limit reached' : 'Rest day'}
+                  {restLimitReached && !isRest ? 'Rest limit reached' : 'Rest day'}
                 </button>
                 {weekRestCount === 1 && !restLimitReached && (
                   <span className="text-[10px] font-body" style={{ color: '#F59E0B' }}>
@@ -220,8 +264,8 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
           key={drawerWorkoutType}
           workoutType={drawerWorkoutType}
           fromType={drawerFromType}
-          onClose={() => { setDrawerOpen(false); setDrawerFromType(null) }}
-          onDone={() => { setDrawerOpen(false); setDrawerFromType(null) }}
+          onClose={handleDrawerClose}
+          onDone={handleDrawerClose}
           onDeleteSession={handleDeleteSession}
         />
       )}

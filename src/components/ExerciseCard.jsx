@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { todayStr } from '../lib/date'
+import { getLocalDateString } from '../lib/dateUtils'
 import { ALL_WORKOUT_TYPES } from '../lib/exercise'
 
 // ── Particle burst ────────────────────────────────────────────────────────────
@@ -80,19 +81,19 @@ function isSetComplete(set, wt) {
   return (parseInt(set.mins) || 0) * 60 + (parseInt(set.secs) || 0) > 0
 }
 
-// Bug Fix 2: default to 1 set
+// Fix 6: default to 1 set with 0 as placeholder values
 function defaultSets(wt) {
-  if (wt === 'barbell' || wt === 'dumbbell') return [{ weight: '', reps: '' }]
-  if (wt === 'cable')  return [{ plates: '', mini: '', reps: '' }]
-  if (wt === 'reps')   return [{ reps: '' }]
-  return [{ mins: '', secs: '' }]
+  if (wt === 'barbell' || wt === 'dumbbell') return [{ weight: '0', reps: '0' }]
+  if (wt === 'cable')  return [{ plates: '0', mini: '0', reps: '0' }]
+  if (wt === 'reps')   return [{ reps: '0' }]
+  return [{ mins: '0', secs: '0' }]
 }
 
 function emptySetRow(wt) {
-  if (wt === 'barbell' || wt === 'dumbbell') return { weight: '', reps: '' }
-  if (wt === 'cable') return { plates: '', mini: '', reps: '' }
-  if (wt === 'reps') return { reps: '' }
-  return { mins: '', secs: '' }
+  if (wt === 'barbell' || wt === 'dumbbell') return { weight: '0', reps: '0' }
+  if (wt === 'cable') return { plates: '0', mini: '0', reps: '0' }
+  if (wt === 'reps') return { reps: '0' }
+  return { mins: '0', secs: '0' }
 }
 
 function setsFromLog(log, wt) {
@@ -222,7 +223,7 @@ export default function ExerciseCard({
   const daysStyle = getDaysStyle(days)
 
   const d30 = new Date(); d30.setDate(d30.getDate() - 30)
-  const d30str = d30.toISOString().slice(0, 10)
+  const d30str = getLocalDateString(d30)
   const last30Count = logs.filter(l => l.log_date >= d30str).length
   const showStreakBadge = last30Count >= 7
 
@@ -379,9 +380,10 @@ export default function ExerciseCard({
   function checkPR(payload) {
     if (wt !== 'barbell' && wt !== 'dumbbell' && wt !== 'cable' && wt !== 'reps') return false
     const priorLogs = logs.filter(l => l.log_date !== today)
-    if (!priorLogs.length) return false
+    // Fix 7A: first-ever log for this exercise is always a PR
+    if (!priorLogs.length) return true
     const histMax = priorLogs.reduce((m, l) => Math.max(m, getMaxFromLog(l, wt)), 0)
-    return histMax > 0 && getMaxFromSets(payload, wt) > histMax
+    return getMaxFromSets(payload, wt) > histMax
   }
 
   async function handleLog() {
@@ -541,6 +543,7 @@ export default function ExerciseCard({
                             value={set.weight}
                             onChange={e => handleWeightInput(i, e.target.value)}
                             onBlur={() => handleWeightBlur(i)}
+                            onFocus={e => e.target.select()}
                             className={`drawer-input w-16 font-mono ${shaking && errs.weight ? 'animate-shake' : ''}`}
                             style={{ borderColor: borderColor(i, 'weight'), ...glowStyle(i, 'weight') }}
                           />
@@ -560,6 +563,7 @@ export default function ExerciseCard({
                           value={set.reps}
                           onChange={e => handleIntInput(i, 'reps', e.target.value)}
                           onBlur={() => touchField(i, 'reps')}
+                          onFocus={e => e.target.select()}
                           className={`drawer-input w-16 ${shaking && errs.reps ? 'animate-shake' : ''}`}
                           style={{ borderColor: borderColor(i, 'reps'), ...glowStyle(i, 'reps') }}
                         />
@@ -575,15 +579,18 @@ export default function ExerciseCard({
                       <>
                         <input type="text" inputMode="numeric" placeholder="1" value={set.plates}
                           onChange={e => handleIntInput(i, 'plates', e.target.value)} onBlur={() => touchField(i, 'plates')}
+                          onFocus={e => e.target.select()}
                           className={`drawer-input w-16 ${shaking && errs.plates ? 'animate-shake' : ''}`}
                           style={{ borderColor: borderColor(i, 'plates') }} />
                         <input type="text" inputMode="numeric" placeholder="0" value={set.mini}
                           onChange={e => handleMiniInput(i, e.target.value)} onBlur={() => touchField(i, 'mini')}
+                          onFocus={e => e.target.select()}
                           className={`drawer-input w-14 ${shaking && errs.mini ? 'animate-shake' : ''}`}
                           style={{ borderColor: borderColor(i, 'mini') }} />
                         <span className="text-xs text-os-muted select-none">×</span>
                         <input type="text" inputMode="numeric" placeholder="reps" value={set.reps}
                           onChange={e => handleIntInput(i, 'reps', e.target.value)} onBlur={() => touchField(i, 'reps')}
+                          onFocus={e => e.target.select()}
                           className={`drawer-input w-16 ${shaking && errs.reps ? 'animate-shake' : ''}`}
                           style={{ borderColor: borderColor(i, 'reps') }} />
                       </>
@@ -593,6 +600,7 @@ export default function ExerciseCard({
                       <>
                         <input type="text" inputMode="numeric" placeholder="reps" value={set.reps}
                           onChange={e => handleIntInput(i, 'reps', e.target.value)} onBlur={() => touchField(i, 'reps')}
+                          onFocus={e => e.target.select()}
                           className={`drawer-input w-28 ${shaking && errs.reps ? 'animate-shake' : ''}`}
                           style={{ borderColor: borderColor(i, 'reps'), ...glowStyle(i, 'reps') }} />
                         {comparisonActive && getCompare(i, 'reps') && (
@@ -607,11 +615,13 @@ export default function ExerciseCard({
                       <>
                         <input type="text" inputMode="numeric" placeholder="mm" value={set.mins}
                           onChange={e => handleMinsInput(i, e.target.value)} onBlur={() => touchField(i, 'mins')}
+                          onFocus={e => e.target.select()}
                           className={`drawer-input w-16 ${shaking && errs.mins ? 'animate-shake' : ''}`}
                           style={{ borderColor: borderColor(i, 'mins') }} />
                         <span className="text-xs text-os-muted select-none">:</span>
                         <input type="text" inputMode="numeric" placeholder="ss" value={set.secs}
                           onChange={e => handleSecsInput(i, e.target.value)}
+                          onFocus={e => e.target.select()}
                           className="drawer-input w-16" />
                       </>
                     )}

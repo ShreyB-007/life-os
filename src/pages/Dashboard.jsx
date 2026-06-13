@@ -30,7 +30,8 @@ export default function Dashboard() {
 
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - 400)
-    const cutoffStr = cutoff.toISOString().slice(0, 10)
+    const y = cutoff.getFullYear(), mo = String(cutoff.getMonth()+1).padStart(2,'0'), d = String(cutoff.getDate()).padStart(2,'0')
+    const cutoffStr = `${y}-${mo}-${d}`
 
     const [logsRes, goalsRes] = await Promise.all([
       supabase

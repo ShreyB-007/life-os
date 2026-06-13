@@ -1,5 +1,7 @@
+import { getLocalDateString } from './dateUtils'
+
 export function todayStr() {
-  return new Date().toISOString().slice(0, 10)
+  return getLocalDateString(new Date())
 }
 
 export function formatDate(date) {

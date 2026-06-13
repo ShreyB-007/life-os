@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayStr } from '../lib/date'
+import { getLocalDateString } from '../lib/dateUtils'
 import ProgressGraph from './ProgressGraph'
 import DeleteConfirmModal from './DeleteConfirmModal'
 
@@ -346,35 +347,40 @@ function HistoryExerciseCard({ exercise, logs, dateFilter, editState, onOpenGrap
     ? logs.filter(l => l.log_date === today)
     : logs.slice(0, 5)
 
-  // PR session: log with the highest max value (only meaningful with 2+ sessions)
-  const prDate = (() => {
-    if (logs.length < 2) return null
-    let maxVal = 0, date = null
-    for (const l of logs) {
-      const v = getMaxValFromLog(l, wt)
-      if (v > maxVal) { maxVal = v; date = l.log_date }
-    }
-    return maxVal > 0 ? date : null
-  })()
-
-  // Consistent badge: 7+ sessions in last 30 days
+  // Consistent: 7+ sessions in last 30 days
   const d30 = new Date(); d30.setDate(d30.getDate() - 30)
-  const d30str = d30.toISOString().slice(0, 10)
+  const d30str = getLocalDateString(d30)
   const last30Count = logs.filter(l => l.log_date >= d30str).length
   const isConsistent = last30Count >= 7
 
   // Neglected: 14+ days since last session
   const isNeglected = days !== null && days >= 14
 
+  // Fix 7B: compute all cumulative PR session dates (each time a new record was set)
+  const prSessionDates = (() => {
+    if (wt !== 'barbell' && wt !== 'dumbbell' && wt !== 'cable' && wt !== 'reps') return new Set()
+    const sorted = [...logs].sort((a, b) => a.log_date < b.log_date ? -1 : 1)
+    const dates = new Set()
+    let maxSoFar = 0
+    for (const l of sorted) {
+      const v = getMaxValFromLog(l, wt)
+      if (v > maxSoFar) { maxSoFar = v; dates.add(l.log_date) }
+    }
+    return dates
+  })()
+
+  // Card-level PR indicator: most recent session was a PR
+  const latestIsPR = prSessionDates.has(logs[0]?.log_date)
+
   const cardBorderStyle = isNeglected
-    ? { border: '1px solid rgba(239,68,68,0.45)', borderLeft: '3px solid #EF4444' }
-    : prDate
+    ? { border: '1px solid rgba(239,68,68,0.45)' }
+    : latestIsPR
     ? { border: '1px solid var(--drawer-card-border)', borderLeft: '3px solid rgba(245,158,11,0.6)' }
     : { border: '1px solid var(--drawer-card-border)' }
 
   return (
     <div
-      className={isNeglected ? 'animate-heartbeat rounded-xl p-4' : 'rounded-xl p-4'}
+      className="relative rounded-xl p-4"
       style={{
         background: isConsistent
           ? 'linear-gradient(135deg, rgba(245,158,11,0.06), var(--drawer-card-bg))'
@@ -382,6 +388,15 @@ function HistoryExerciseCard({ exercise, logs, dateFilter, editState, onOpenGrap
         ...cardBorderStyle,
       }}
     >
+      {/* Fix MISSED: neglected pulsing left border (opacity-based, not scale) */}
+      {isNeglected && (
+        <div style={{
+          position: 'absolute', left: 0, top: 0, bottom: 0, width: 3,
+          borderRadius: '12px 0 0 12px',
+          background: '#EF4444',
+          animation: 'neglectedPulse 2s ease-in-out infinite',
+        }} />
+      )}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0 mr-2">
           <div className="flex items-center gap-2 flex-wrap">
@@ -392,17 +407,13 @@ function HistoryExerciseCard({ exercise, logs, dateFilter, editState, onOpenGrap
             >
               {wt}
             </span>
-            {isConsistent && (
-              <span
-                className="text-[10px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
-                style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.25)' }}
-              >
-                🔥 {last30Count}
-              </span>
-            )}
           </div>
-          <p className="text-xs font-body mt-0.5" style={{ color: isNeglected ? '#EF4444' : 'var(--os-muted)' }}>
-            {daysLabel(days)}
+          {/* Fix MISSED: "Consistent 🔥" amber text label + days-since on same line */}
+          <p className="text-xs font-body mt-0.5">
+            <span style={{ color: isNeglected ? '#EF4444' : 'var(--os-muted)' }}>{daysLabel(days)}</span>
+            {isConsistent && (
+              <span style={{ color: '#F59E0B', marginLeft: 8, fontSize: 11 }}>Consistent 🔥 {last30Count}</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
@@ -432,7 +443,7 @@ function HistoryExerciseCard({ exercise, logs, dateFilter, editState, onOpenGrap
           {displayLogs.map(log => {
             const isEditing = editState?.exerciseId === exercise.id && editState?.logId === log.id
             const isToday = log.log_date === today
-            const isPRSession = log.log_date === prDate
+            const isPRSession = prSessionDates.has(log.log_date)
             return (
               <div key={log.id}>
                 <div

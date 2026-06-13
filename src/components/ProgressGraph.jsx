@@ -3,6 +3,7 @@
  * - Fix 4: Weight / Reps view toggle for barbell/dumbbell/cable exercises
  * - Fix 5: Y axis domain + ticks at 2.5kg intervals (or 1/2/5 for reps); correct decimal formatter
  * - Fix 6: Overlapping dot offset in compare mode; combined per-date tooltip
+ * - Fix 7C: Gold star markers at cumulative PR sessions (single-series mode only)
  */
 import { useState } from 'react'
 
@@ -201,6 +202,24 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
 
   const sessions = [...logs].reverse()
   const n = sessions.length
+
+  // Fix 7C: compute cumulative PR session indices (each time a new record was set, oldest→newest)
+  const prIndexes = (() => {
+    const idxSet = new Set()
+    if (wt === 'barbell' || wt === 'dumbbell' || wt === 'cable' || wt === 'reps') {
+      let maxSoFar = 0
+      for (let i = 0; i < n; i++) {
+        const sets = sessions[i]?.sets
+        if (!sets?.length) continue
+        let val
+        if (wt === 'barbell' || wt === 'dumbbell') val = Math.max(0, ...sets.map(s => s.weight || 0))
+        else if (wt === 'cable') val = Math.max(0, ...sets.map(s => (s.plates || 0) + (s.mini || 0) * 0.5))
+        else val = Math.max(0, ...sets.map(s => s.reps || 0))
+        if (val > maxSoFar) { maxSoFar = val; idxSet.add(i) }
+      }
+    }
+    return idxSet
+  })()
 
   const maxSets = Math.max(0, ...sessions.map(s => s.sets?.length || 0))
   const seriesOptions = [
@@ -425,11 +444,18 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
                       const isHov = compareMode
                         ? hovered?.sessionIdx === i
                         : hovered?.seriesKey === key && hovered?.sessionIdx === i
+                      // Fix 7C: gold star for cumulative PR sessions (single-series only)
+                      const isPR = !compareMode && prIndexes.has(i)
 
                       return (
                         <g key={i}>
-                          <circle cx={cx} cy={cy} r={isHov ? 5 : 3.5} fill={color} />
-                          {isHov && <circle cx={cx} cy={cy} r="9" fill={color} fillOpacity="0.18" />}
+                          {isPR ? (
+                            <circle cx={cx} cy={cy} r={isHov ? 6 : 4.5} fill="#F59E0B" />
+                          ) : (
+                            <circle cx={cx} cy={cy} r={isHov ? 5 : 3.5} fill={color} />
+                          )}
+                          {isPR && <circle cx={cx} cy={cy} r={isHov ? 10 : 7} fill="#F59E0B" fillOpacity="0.15" />}
+                          {!isPR && isHov && <circle cx={cx} cy={cy} r="9" fill={color} fillOpacity="0.18" />}
 
                           {/* Individual tooltip for single-series mode */}
                           {!compareMode && isHov && (() => {

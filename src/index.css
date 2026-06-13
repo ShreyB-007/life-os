@@ -388,6 +388,12 @@ html.dark .nav-link-hover:hover {
   66%      { transform: translate(-12px, 18px) scale(0.94); }
 }
 
+/* ─── Neglected exercise pulse (HistoryDrawer left-border) ───────────── */
+@keyframes neglectedPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
 /* ─── Workout drawer inputs ──────────────────────────── */
 .drawer-input {
   border: 1px solid var(--drawer-card-border);
