@@ -81,6 +81,16 @@ function daysSince(dateStr) {
   return Math.floor((today - new Date(dateStr + 'T00:00:00')) / 86400000)
 }
 
+function getMaxValFromLog(log, wt) {
+  if (!log?.sets?.length) return 0
+  return Math.max(0, ...log.sets.map(s => {
+    if (wt === 'barbell' || wt === 'dumbbell') return parseFloat(s.weight) || 0
+    if (wt === 'cable') return (parseInt(s.plates) || 0) + (parseInt(s.mini) || 0) * 0.5
+    if (wt === 'reps') return parseInt(s.reps) || 0
+    return 0
+  }))
+}
+
 function fmtDate(dateStr) {
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
   const [, m, d] = dateStr.split('-')
@@ -336,10 +346,41 @@ function HistoryExerciseCard({ exercise, logs, dateFilter, editState, onOpenGrap
     ? logs.filter(l => l.log_date === today)
     : logs.slice(0, 5)
 
+  // PR session: log with the highest max value (only meaningful with 2+ sessions)
+  const prDate = (() => {
+    if (logs.length < 2) return null
+    let maxVal = 0, date = null
+    for (const l of logs) {
+      const v = getMaxValFromLog(l, wt)
+      if (v > maxVal) { maxVal = v; date = l.log_date }
+    }
+    return maxVal > 0 ? date : null
+  })()
+
+  // Consistent badge: 7+ sessions in last 30 days
+  const d30 = new Date(); d30.setDate(d30.getDate() - 30)
+  const d30str = d30.toISOString().slice(0, 10)
+  const last30Count = logs.filter(l => l.log_date >= d30str).length
+  const isConsistent = last30Count >= 7
+
+  // Neglected: 14+ days since last session
+  const isNeglected = days !== null && days >= 14
+
+  const cardBorderStyle = isNeglected
+    ? { border: '1px solid rgba(239,68,68,0.45)', borderLeft: '3px solid #EF4444' }
+    : prDate
+    ? { border: '1px solid var(--drawer-card-border)', borderLeft: '3px solid rgba(245,158,11,0.6)' }
+    : { border: '1px solid var(--drawer-card-border)' }
+
   return (
     <div
-      className="rounded-xl p-4"
-      style={{ background: 'var(--drawer-card-bg)', border: '1px solid var(--drawer-card-border)' }}
+      className={isNeglected ? 'animate-heartbeat rounded-xl p-4' : 'rounded-xl p-4'}
+      style={{
+        background: isConsistent
+          ? 'linear-gradient(135deg, rgba(245,158,11,0.06), var(--drawer-card-bg))'
+          : 'var(--drawer-card-bg)',
+        ...cardBorderStyle,
+      }}
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0 mr-2">
@@ -351,8 +392,18 @@ function HistoryExerciseCard({ exercise, logs, dateFilter, editState, onOpenGrap
             >
               {wt}
             </span>
+            {isConsistent && (
+              <span
+                className="text-[10px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
+                style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.25)' }}
+              >
+                🔥 {last30Count}
+              </span>
+            )}
           </div>
-          <p className="text-xs font-body text-os-muted mt-0.5">{daysLabel(days)}</p>
+          <p className="text-xs font-body mt-0.5" style={{ color: isNeglected ? '#EF4444' : 'var(--os-muted)' }}>
+            {daysLabel(days)}
+          </p>
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
           <button
@@ -377,14 +428,31 @@ function HistoryExerciseCard({ exercise, logs, dateFilter, editState, onOpenGrap
           {dateFilter === 'today' ? 'No workout logged today' : 'No sessions logged yet'}
         </p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {displayLogs.map(log => {
             const isEditing = editState?.exerciseId === exercise.id && editState?.logId === log.id
+            const isToday = log.log_date === today
+            const isPRSession = log.log_date === prDate
             return (
               <div key={log.id}>
-                <div className="flex items-center gap-2 text-xs font-body">
+                <div
+                  className="flex items-center gap-2 text-xs font-body rounded-lg px-2 py-1"
+                  style={isToday ? {
+                    border: '1px solid rgba(16,185,129,0.45)',
+                    background: 'rgba(16,185,129,0.04)',
+                    boxShadow: '0 0 10px rgba(16,185,129,0.08)',
+                  } : isPRSession ? {
+                    border: '1px solid rgba(245,158,11,0.35)',
+                    background: 'rgba(245,158,11,0.04)',
+                  } : {}}
+                >
                   <span className="text-os-muted flex-shrink-0 w-12">{fmtDate(log.log_date)}</span>
-                  <span className="text-os-muted">—</span>
+                  {isToday && (
+                    <span className="text-[9px] font-mono px-1 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>Today</span>
+                  )}
+                  {isPRSession && !isToday && (
+                    <i className="ti ti-trophy text-[11px] flex-shrink-0" style={{ color: '#F59E0B' }} />
+                  )}
                   <span className="text-os-secondary flex-1 min-w-0 truncate">{fmtSets(log, wt)}</span>
                   {!isEditing && (
                     <button

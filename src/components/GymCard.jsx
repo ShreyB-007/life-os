@@ -27,10 +27,8 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
   const [booped, setBooped]                   = useState(false)
   const [drawerOpen, setDrawerOpen]           = useState(false)
   const [drawerWorkoutType, setDrawerWorkoutType] = useState(null)
+  const [drawerFromType, setDrawerFromType]   = useState(null)
   const [historyOpen, setHistoryOpen]         = useState(false)
-  const [checking, setChecking]               = useState(false)
-  const [pendingDeselect, setPendingDeselect] = useState(null)  // { type, logs }
-  const [pendingSwitch, setPendingSwitch]     = useState(null)  // { fromType, toType, logs }
 
   useEffect(() => {
     if (todayLog) {
@@ -72,152 +70,37 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     setSaving(false)
   }
 
-  async function fetchTodayLogsForType(workoutType) {
-    const { data: exs } = await supabase
-      .from('exercises')
-      .select('id')
-      .contains('workout_type_tags', [workoutType])
-    if (!exs?.length) return []
-    const ids = exs.map(e => e.id)
-    const { data: logs } = await supabase
-      .from('exercise_logs')
-      .select('id, exercise_id')
-      .in('exercise_id', ids)
-      .eq('log_date', todayStr())
-    return logs || []
-  }
-
-  // After transferring a log from sourceType, clean up the exercise's source tag
-  // if the exercise has no prior history in source (today was its only session there).
-  async function cleanupSourceAfterTransfer(exerciseId, sourceType, targetType) {
-    const today = todayStr()
-
-    const { data: priorLogs } = await supabase
-      .from('exercise_logs')
-      .select('id')
-      .eq('exercise_id', exerciseId)
-      .lt('log_date', today)
-      .limit(1)
-
-    if (priorLogs?.length > 0) return  // Has history in source — leave it there
-
-    const { data: exercise } = await supabase
-      .from('exercises')
-      .select('id, workout_type_tags, primary_workout_type')
-      .eq('id', exerciseId)
-      .single()
-    if (!exercise) return  // Already removed
-
-    const cleanedTags = (exercise.workout_type_tags || []).filter(t => t !== sourceType)
-
-    if (cleanedTags.length === 0) {
-      // No other types in tags after removing source — check if any logs remain
-      const { data: remainingLogs } = await supabase
-        .from('exercise_logs').select('id').eq('exercise_id', exerciseId).limit(1)
-
-      if (!remainingLogs?.length) {
-        // Log was re-pointed to a matching exercise; this record is now orphaned
-        await supabase.from('exercises').delete().eq('id', exerciseId)
-      } else {
-        // Exercise carries its log to target; update its home
-        await supabase.from('exercises').update({
-          workout_type_tags: [targetType],
-          primary_workout_type: targetType,
-        }).eq('id', exerciseId)
-      }
-    } else {
-      await supabase.from('exercises').update({ workout_type_tags: cleanedTags }).eq('id', exercise.id)
-    }
-  }
-
-  async function selectWorkout(type) {
-    if (checking) return
-
+  function selectWorkout(type) {
     if (selected === type) {
-      setChecking(true)
-      const logs = await fetchTodayLogsForType(type)
-      setChecking(false)
-      if (logs.length > 0) {
-        setPendingDeselect({ type, logs })
-      } else {
-        doDeselect()
-      }
+      // Re-tap active type: just open the drawer; it has "Delete today's session" inside
+      setDrawerWorkoutType(type)
+      setDrawerFromType(null)
+      setDrawerOpen(true)
       return
     }
 
-    if (selected !== null) {
-      setChecking(true)
-      const logs = await fetchTodayLogsForType(selected)
-      setChecking(false)
-      if (logs.length > 0) {
-        setPendingSwitch({ fromType: selected, toType: type, logs })
-        return
-      }
-    }
-
-    doSelect(type)
+    // Switching from one type to another — pass previous type so drawer can offer transfer
+    const fromType = (isDone && !isRest) ? selected : null
+    doSelect(type, fromType)
   }
 
-  function doDeselect() {
-    setSelected(null)
-    setIsRest(false)
-    save(null, false, false)
-    setDrawerOpen(false)
-    setPendingDeselect(null)
-  }
-
-  function doSelect(type) {
+  function doSelect(type, fromType = null) {
     const wasAlreadyDone = isDone
     setSelected(type)
     setIsRest(false)
     save(type, false, true)
     if (!wasAlreadyDone) triggerBoop()
     setDrawerWorkoutType(type)
+    setDrawerFromType(fromType)
     setDrawerOpen(true)
   }
 
-  async function confirmDeselect() {
-    const ids = pendingDeselect.logs.map(l => l.id)
-    if (ids.length) await supabase.from('exercise_logs').delete().in('id', ids)
-    doDeselect()
-  }
-
-  async function confirmSwitch() {
-    const { fromType, toType, logs } = pendingSwitch
-
-    for (const log of logs) {
-      const { data: exercise } = await supabase
-        .from('exercises')
-        .select('id, normalized_name, workout_type_tags, primary_workout_type')
-        .eq('id', log.exercise_id)
-        .single()
-      if (!exercise) continue
-
-      const tags = exercise.workout_type_tags || []
-
-      if (!tags.includes(toType)) {
-        const { data: match } = await supabase
-          .from('exercises')
-          .select('id')
-          .eq('normalized_name', exercise.normalized_name)
-          .contains('workout_type_tags', [toType])
-          .maybeSingle()
-
-        if (match) {
-          await supabase.from('exercise_logs').update({ exercise_id: match.id }).eq('id', log.id)
-        } else {
-          await supabase.from('exercises')
-            .update({ workout_type_tags: [...tags, toType] })
-            .eq('id', exercise.id)
-        }
-      }
-
-      // Remove source type from this exercise if it has no prior history in source
-      await cleanupSourceAfterTransfer(exercise.id, fromType, toType)
-    }
-
-    setPendingSwitch(null)
-    doSelect(toType)
+  function handleDeleteSession() {
+    setSelected(null)
+    setIsRest(false)
+    save(null, false, false)
+    setDrawerOpen(false)
+    setDrawerFromType(null)
   }
 
   function markRest() {
@@ -236,6 +119,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
 
   function openDrawerManually() {
     setDrawerWorkoutType(selected)
+    setDrawerFromType(null)
     setDrawerOpen(true)
   }
 
@@ -267,11 +151,9 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
                 <button
                   key={key}
                   onClick={() => selectWorkout(key)}
-                  disabled={checking}
                   className={[
                     'flex flex-col items-start px-3 py-2.5 rounded-lg text-left transition-all',
                     active ? '' : 'gym-type-btn',
-                    checking ? 'opacity-60 cursor-wait' : '',
                   ].join(' ')}
                   style={active ? {
                     background: 'rgba(99,102,241,0.12)',
@@ -288,7 +170,6 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {/* History button */}
               <button
                 onClick={() => setHistoryOpen(true)}
                 className="p-1.5 rounded-md text-os-muted hover:text-os-fg transition-colors"
@@ -338,89 +219,15 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
         <WorkoutDrawer
           key={drawerWorkoutType}
           workoutType={drawerWorkoutType}
-          onClose={() => setDrawerOpen(false)}
-          onDone={() => setDrawerOpen(false)}
+          fromType={drawerFromType}
+          onClose={() => { setDrawerOpen(false); setDrawerFromType(null) }}
+          onDone={() => { setDrawerOpen(false); setDrawerFromType(null) }}
+          onDeleteSession={handleDeleteSession}
         />
       )}
 
       {historyOpen && (
         <HistoryDrawer onClose={() => setHistoryOpen(false)} />
-      )}
-
-      {/* Deselect confirmation modal */}
-      {pendingDeselect && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-            style={{ zIndex: 160 }}
-            onClick={() => setPendingDeselect(null)}
-          />
-          <div
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl p-5 w-full max-w-sm mx-4"
-            style={{ zIndex: 161, background: 'var(--drawer-bg)', border: '1px solid var(--drawer-card-border)' }}
-          >
-            <h3 className="font-display font-semibold text-sm text-os-fg mb-2">
-              Remove {pendingDeselect.type} day?
-            </h3>
-            <p className="text-sm font-body text-os-secondary mb-5">
-              You've already logged {pendingDeselect.logs.length} exercise{pendingDeselect.logs.length !== 1 ? 's' : ''} for today's {pendingDeselect.type} session. Deselecting will permanently delete today's workout log. This cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setPendingDeselect(null)}
-                className="flex-1 py-2.5 rounded-lg text-sm font-body font-medium text-os-secondary transition-colors hover:text-os-fg"
-                style={{ border: '1px solid var(--drawer-card-border)' }}
-              >
-                Keep it
-              </button>
-              <button
-                onClick={confirmDeselect}
-                className="flex-1 py-2.5 rounded-lg text-sm font-body font-semibold text-white transition-opacity hover:opacity-90"
-                style={{ background: '#EF4444' }}
-              >
-                Delete and deselect
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Switch confirmation modal */}
-      {pendingSwitch && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-            style={{ zIndex: 160 }}
-            onClick={() => setPendingSwitch(null)}
-          />
-          <div
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl p-5 w-full max-w-sm mx-4"
-            style={{ zIndex: 161, background: 'var(--drawer-bg)', border: '1px solid var(--drawer-card-border)' }}
-          >
-            <h3 className="font-display font-semibold text-sm text-os-fg mb-2">
-              Switch to {pendingSwitch.toType} day?
-            </h3>
-            <p className="text-sm font-body text-os-secondary mb-5">
-              You've logged {pendingSwitch.logs.length} exercise{pendingSwitch.logs.length !== 1 ? 's' : ''} for {pendingSwitch.fromType} today. Your {pendingSwitch.fromType} log will be automatically moved to {pendingSwitch.toType}. You can move it back any time by switching again.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setPendingSwitch(null)}
-                className="flex-1 py-2.5 rounded-lg text-sm font-body font-medium text-os-secondary transition-colors hover:text-os-fg"
-                style={{ border: '1px solid var(--drawer-card-border)' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmSwitch}
-                className="flex-1 py-2.5 rounded-lg text-sm font-body font-semibold text-white transition-opacity hover:opacity-90"
-                style={{ background: '#6366F1' }}
-              >
-                Switch and move data
-              </button>
-            </div>
-          </div>
-        </>
       )}
     </>
   )

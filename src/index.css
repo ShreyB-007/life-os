@@ -94,6 +94,10 @@
   --drawer-card-bg-exp: #F1F1F8;
   --drawer-card-border: rgba(0, 0, 0, 0.08);
   --drawer-ref-bg: rgba(0, 0, 0, 0.04);
+  /* Drawer atmosphere */
+  --drawer-cursor-glow: rgba(99, 102, 241, 0.04);
+  --drawer-blob-1: rgba(99, 102, 241, 0.025);
+  --drawer-blob-2: rgba(139, 92, 246, 0.018);
 }
 
 html.dark {
@@ -119,6 +123,10 @@ html.dark {
   --drawer-card-bg-exp: #141428;
   --drawer-card-border: #1C1C2E;
   --drawer-ref-bg: rgba(255, 255, 255, 0.03);
+  /* Drawer atmosphere */
+  --drawer-cursor-glow: rgba(99, 102, 241, 0.07);
+  --drawer-blob-1: rgba(99, 102, 241, 0.05);
+  --drawer-blob-2: rgba(139, 92, 246, 0.035);
 }
 
 @layer base {
@@ -371,6 +379,13 @@ html.dark .nav-link-hover:hover {
   animation: bar-shine 1.2s ease forwards;
   pointer-events: none;
   border-radius: inherit;
+}
+
+/* ─── Drawer atmospheric blob drift ─────────────────── */
+@keyframes drawerBlobDrift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(18px, -28px) scale(1.08); }
+  66%      { transform: translate(-12px, 18px) scale(0.94); }
 }
 
 /* ─── Workout drawer inputs ──────────────────────────── */

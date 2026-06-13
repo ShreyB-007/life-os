@@ -89,6 +89,38 @@ export default {
           '0%':   { transform: 'translateY(100%)' },
           '100%': { transform: 'translateY(0)' },
         },
+        heartbeat: {
+          '0%, 100%': { transform: 'scale(1)' },
+          '50%':      { transform: 'scale(1.08)' },
+        },
+        'pop-in': {
+          '0%':   { transform: 'scale(0)', opacity: '0' },
+          '70%':  { transform: 'scale(1.15)', opacity: '1' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+        'slide-in-right': {
+          '0%':   { transform: 'translateX(10px) scale(0.85)', opacity: '0' },
+          '100%': { transform: 'translateX(0) scale(1)', opacity: '1' },
+        },
+        'breathe-glow': {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(99,102,241,0)' },
+          '50%':      { boxShadow: '0 0 0 5px rgba(99,102,241,0.28)' },
+        },
+        shake: {
+          '0%, 100%': { transform: 'translateX(0)' },
+          '20%':      { transform: 'translateX(-4px)' },
+          '40%':      { transform: 'translateX(4px)' },
+          '60%':      { transform: 'translateX(-3px)' },
+          '80%':      { transform: 'translateX(3px)' },
+        },
+        'slot-up': {
+          '0%':   { opacity: '0', transform: 'translateY(-6px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'slot-down': {
+          '0%':   { opacity: '0', transform: 'translateY(6px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
       },
       animation: {
         'pulse-warm':      'pulse-streak 2s ease-in-out infinite',
@@ -105,6 +137,13 @@ export default {
         'banner-shimmer':      'banner-shimmer 1.5s ease 1 forwards',
         'cosmic-text-shift':   'cosmic-text-shift 3.5s linear infinite',
         'slide-up-drawer':     'slide-up-drawer 300ms cubic-bezier(0.32, 0.72, 0, 1) both',
+        heartbeat:             'heartbeat 1.4s ease-in-out infinite',
+        'pop-in':              'pop-in 0.25s ease-out forwards',
+        'slide-in-right':      'slide-in-right 0.28s ease-out forwards',
+        'breathe-glow':        'breathe-glow 2s ease-in-out infinite',
+        shake:                 'shake 0.3s ease-out',
+        'slot-up':             'slot-up 0.12s ease-out forwards',
+        'slot-down':           'slot-down 0.12s ease-out forwards',
       },
     },
   },

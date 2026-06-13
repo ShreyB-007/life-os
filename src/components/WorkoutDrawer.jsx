@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayStr } from '../lib/date'
 import { normalizeExerciseName } from '../lib/exercise'
@@ -7,21 +7,37 @@ import AddExerciseModal from './AddExerciseModal'
 import DeleteConfirmModal from './DeleteConfirmModal'
 import ProgressGraph from './ProgressGraph'
 
-export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
-  const [exercises, setExercises] = useState([])
-  const [logs, setLogs]           = useState({})   // exercise_id → log[] sorted desc
-  const [loading, setLoading]     = useState(true)
-  const [expandedId, setExpandedId]   = useState(null)
-  const [showAdd, setShowAdd]         = useState(false)
-  const [graphExercise, setGraphExercise] = useState(null)
-  const [deleteTarget, setDeleteTarget]   = useState(null)
-  const [toast, setToast]             = useState(null)
+const WORKOUT_EMOJIS = { Push: '💪', Pull: '🏋️', Legs: '🦵', Cardio: '🏃' }
+
+export default function WorkoutDrawer({ workoutType, fromType, onClose, onDone, onDeleteSession }) {
+  const [exercises, setExercises]             = useState([])
+  const [logs, setLogs]                       = useState({})
+  const [loading, setLoading]                 = useState(true)
+  const [expandedId, setExpandedId]           = useState(null)
+  const [showAdd, setShowAdd]                 = useState(false)
+  const [graphExercise, setGraphExercise]     = useState(null)
+  const [deleteTarget, setDeleteTarget]       = useState(null)
+  const [toast, setToast]                     = useState(null)
+  const [showTransferBanner, setShowTransferBanner] = useState(false)
+  const [transferring, setTransferring]       = useState(false)
+  const [deletingSession, setDeletingSession] = useState(false)
+  const [cursor, setCursor]                   = useState({ x: 200, y: 200 })
+
+  const drawerRef = useRef(null)
 
   useEffect(() => { fetchData() }, [workoutType])
 
+  useEffect(() => {
+    if (fromType) checkForTransfer()
+  }, [fromType])
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
   async function fetchData() {
     setLoading(true)
-    // Exercises are global; fetch those tagged for this workout type
     const { data: exs } = await supabase
       .from('exercises')
       .select('*')
@@ -43,8 +59,96 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
       for (const ex of exs) map[ex.id] = []
       for (const l of (logData || [])) map[l.exercise_id].push(l)
       setLogs(map)
+    } else {
+      setLogs({})
     }
     setLoading(false)
+  }
+
+  async function checkForTransfer() {
+    const today = todayStr()
+    const { data: fromExs } = await supabase
+      .from('exercises')
+      .select('id')
+      .contains('workout_type_tags', [fromType])
+    if (!fromExs?.length) return
+
+    const { data: fromLogs } = await supabase
+      .from('exercise_logs')
+      .select('id')
+      .in('exercise_id', fromExs.map(e => e.id))
+      .eq('log_date', today)
+
+    if (fromLogs?.length) setShowTransferBanner(true)
+  }
+
+  async function handleTransfer() {
+    setTransferring(true)
+    const today = todayStr()
+
+    const { data: fromExs } = await supabase
+      .from('exercises')
+      .select('id, normalized_name, workout_type_tags, primary_workout_type')
+      .contains('workout_type_tags', [fromType])
+
+    if (!fromExs?.length) { setTransferring(false); setShowTransferBanner(false); return }
+
+    const { data: fromLogs } = await supabase
+      .from('exercise_logs')
+      .select('id, exercise_id')
+      .in('exercise_id', fromExs.map(e => e.id))
+      .eq('log_date', today)
+
+    if (!fromLogs?.length) { setTransferring(false); setShowTransferBanner(false); return }
+
+    for (const log of fromLogs) {
+      const exercise = fromExs.find(e => e.id === log.exercise_id)
+      if (!exercise) continue
+
+      const tags = exercise.workout_type_tags || []
+
+      if (!tags.includes(workoutType)) {
+        const { data: match } = await supabase
+          .from('exercises')
+          .select('id')
+          .eq('normalized_name', exercise.normalized_name)
+          .contains('workout_type_tags', [workoutType])
+          .maybeSingle()
+
+        if (match) {
+          await supabase.from('exercise_logs').update({ exercise_id: match.id }).eq('id', log.id)
+        } else {
+          await supabase.from('exercises')
+            .update({ workout_type_tags: [...tags, workoutType] })
+            .eq('id', exercise.id)
+        }
+      }
+
+      // Clean up source type if exercise has no prior history there
+      const { data: priorLogs } = await supabase
+        .from('exercise_logs')
+        .select('id')
+        .eq('exercise_id', exercise.id)
+        .lt('log_date', today)
+        .limit(1)
+
+      if (!priorLogs?.length) {
+        const cleanedTags = tags.filter(t => t !== fromType)
+        if (cleanedTags.length === 0) {
+          await supabase.from('exercises').update({
+            workout_type_tags: [workoutType],
+            primary_workout_type: workoutType,
+          }).eq('id', exercise.id)
+        } else {
+          await supabase.from('exercises').update({ workout_type_tags: cleanedTags }).eq('id', exercise.id)
+        }
+      }
+    }
+
+    setShowTransferBanner(false)
+    setTransferring(false)
+    await fetchData()
+    showToast(`Session transferred from ${fromType}`)
   }
 
   function handleLogSave(exerciseId, entry) {
@@ -54,17 +158,13 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
     }))
   }
 
-  // Returns null on success, or a string error for AddExerciseModal
   async function handleAdd(name, weightType) {
     const normalized = normalizeExerciseName(name)
-
-    // Check global duplicate by normalized_name
     const { data: existing } = await supabase
       .from('exercises')
       .select('name')
       .eq('normalized_name', normalized)
       .maybeSingle()
-
     if (existing) return `duplicate:${existing.name}`
 
     const { data, error } = await supabase
@@ -78,7 +178,6 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
       })
       .select()
       .single()
-
     if (error) return 'error'
 
     setExercises(prev => [...prev, data])
@@ -89,17 +188,28 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
 
   async function handleDeleteClick(exercise) {
     const today = todayStr()
-    const { data: priorLogs } = await supabase
-      .from('exercise_logs')
-      .select('id')
-      .eq('exercise_id', exercise.id)
-      .lt('log_date', today)
+    // Use local state as primary source (fetchData loaded all logs)
+    const localLogs = logs[exercise.id] || []
+    const localPrior = localLogs.filter(l => l.log_date < today)
 
-    const priorCount = priorLogs?.length || 0
-    const hasPriorLogs = priorCount > 0
+    // Confirm with DB if local says no prior logs (critical path)
+    let hasPriorLogs = localPrior.length > 0
+    let priorCount   = localPrior.length
+
+    if (!hasPriorLogs) {
+      const { data: dbPrior } = await supabase
+        .from('exercise_logs')
+        .select('id')
+        .eq('exercise_id', exercise.id)
+        .lt('log_date', today)
+
+      hasPriorLogs = Array.isArray(dbPrior) ? dbPrior.length > 0 : false
+      priorCount   = Array.isArray(dbPrior) ? dbPrior.length : 0
+    }
+
     const bodyText = hasPriorLogs
       ? `This will delete today's log for ${exercise.name}. The exercise and its ${priorCount} previous session${priorCount !== 1 ? 's' : ''} will be kept.`
-      : `This will permanently remove ${exercise.name} and all its data from your library. It has no prior history.`
+      : `This will permanently remove ${exercise.name} from your library. It has no prior history.`
 
     setDeleteTarget({ exercise, hasPriorLogs, bodyText })
   }
@@ -109,21 +219,60 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
     const today = todayStr()
 
     if (!hasPriorLogs) {
-      await supabase.from('exercises').delete().eq('id', exercise.id)
-      setExercises(prev => prev.filter(e => e.id !== exercise.id))
-      setLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
-      showToast(`${exercise.name} deleted`)
+      // Explicitly delete logs first, then exercise (safe even if CASCADE is set)
+      await supabase.from('exercise_logs').delete().eq('exercise_id', exercise.id)
+      const { error } = await supabase.from('exercises').delete().eq('id', exercise.id)
+      if (!error) {
+        setExercises(prev => prev.filter(e => e.id !== exercise.id))
+        setLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
+        showToast(`${exercise.name} removed from library`)
+      } else {
+        showToast('Delete failed — check permissions')
+      }
     } else {
-      await supabase.from('exercise_logs').delete()
+      const { error } = await supabase.from('exercise_logs').delete()
         .eq('exercise_id', exercise.id).eq('log_date', today)
-      setLogs(prev => ({
-        ...prev,
-        [exercise.id]: (prev[exercise.id] || []).filter(l => l.log_date !== today),
-      }))
-      showToast(`Today's ${exercise.name} log removed`)
+      if (!error) {
+        setLogs(prev => ({
+          ...prev,
+          [exercise.id]: (prev[exercise.id] || []).filter(l => l.log_date !== today),
+        }))
+        showToast(`Today's ${exercise.name} log removed`)
+      }
     }
 
     setDeleteTarget(null)
+  }
+
+  async function handleDeleteTodaySession() {
+    if (deletingSession) return
+    setDeletingSession(true)
+    const today = todayStr()
+
+    for (const ex of exercises) {
+      const todayLog = (logs[ex.id] || []).find(l => l.log_date === today)
+      if (!todayLog) continue
+
+      const priorLogs = (logs[ex.id] || []).filter(l => l.log_date < today)
+
+      if (priorLogs.length === 0) {
+        // No prior history: remove from library entirely
+        await supabase.from('exercise_logs').delete().eq('exercise_id', ex.id)
+        await supabase.from('exercises').delete().eq('id', ex.id)
+        setExercises(prev => prev.filter(e => e.id !== ex.id))
+        setLogs(prev => { const n = { ...prev }; delete n[ex.id]; return n })
+      } else {
+        // Has prior history: only delete today's log
+        await supabase.from('exercise_logs').delete().eq('id', todayLog.id)
+        setLogs(prev => ({
+          ...prev,
+          [ex.id]: (prev[ex.id] || []).filter(l => l.log_date !== today),
+        }))
+      }
+    }
+
+    setDeletingSession(false)
+    onDeleteSession?.()
   }
 
   async function handleAddTag(exerciseId, type) {
@@ -145,10 +294,14 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
     setTimeout(() => setToast(null), 3000)
   }
 
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
-  }, [])
+  function handleMouseMove(e) {
+    const rect = drawerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setCursor({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+  }
+
+  const today = todayStr()
+  const hasTodaySession = exercises.some(ex => (logs[ex.id] || []).some(l => l.log_date === today))
 
   return (
     <>
@@ -161,71 +314,156 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
 
       {/* Drawer */}
       <div
-        className="fixed bottom-0 left-0 right-0 rounded-t-2xl flex flex-col animate-slide-up-drawer"
-        style={{ zIndex: 101, height: '75vh', background: 'var(--drawer-bg)', borderTop: '1px solid var(--drawer-card-border)', borderLeft: '1px solid var(--drawer-card-border)', borderRight: '1px solid var(--drawer-card-border)' }}
+        ref={drawerRef}
+        className="fixed bottom-0 left-0 right-0 rounded-t-2xl flex flex-col animate-slide-up-drawer overflow-hidden"
+        style={{
+          zIndex: 101,
+          height: '75vh',
+          background: 'var(--drawer-bg)',
+          borderTop: '1px solid var(--drawer-card-border)',
+          borderLeft: '1px solid var(--drawer-card-border)',
+          borderRight: '1px solid var(--drawer-card-border)',
+          position: 'fixed',
+        }}
         onClick={e => e.stopPropagation()}
+        onMouseMove={handleMouseMove}
       >
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
-          <div className="w-10 h-1 rounded-full" style={{ background: 'var(--drawer-card-border)' }} />
-        </div>
+        {/* Atmospheric cursor glow */}
+        <div
+          style={{
+            position: 'absolute',
+            pointerEvents: 'none',
+            width: 400, height: 400,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, var(--drawer-cursor-glow) 0%, transparent 70%)',
+            left: cursor.x - 200,
+            top: cursor.y - 200,
+            zIndex: 0,
+            transition: 'left 60ms ease, top 60ms ease',
+          }}
+        />
+        {/* Atmospheric blob 1 */}
+        <div style={{
+          position: 'absolute', pointerEvents: 'none', zIndex: 0,
+          width: 320, height: 320, borderRadius: '50%',
+          background: 'radial-gradient(circle, var(--drawer-blob-1) 0%, transparent 70%)',
+          top: -80, right: -60,
+          animation: 'drawerBlobDrift 18s ease-in-out infinite',
+        }} />
+        {/* Atmospheric blob 2 */}
+        <div style={{
+          position: 'absolute', pointerEvents: 'none', zIndex: 0,
+          width: 260, height: 260, borderRadius: '50%',
+          background: 'radial-gradient(circle, var(--drawer-blob-2) 0%, transparent 70%)',
+          bottom: 120, left: -60,
+          animation: 'drawerBlobDrift 24s ease-in-out infinite reverse',
+        }} />
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--drawer-card-border)' }}>
-          <h2 className="font-display font-semibold text-base text-os-fg">{workoutType} Day</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-os-muted hover:text-os-fg transition-colors">
-            <i className="ti ti-x text-lg" />
-          </button>
-        </div>
+        {/* Content above blobs */}
+        <div className="flex flex-col flex-1 min-h-0 relative" style={{ zIndex: 1 }}>
+          {/* Handle */}
+          <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+            <div className="w-10 h-1 rounded-full" style={{ background: 'var(--drawer-card-border)' }} />
+          </div>
 
-        {/* Scrollable list */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <span className="text-sm font-body text-os-muted">Loading exercises…</span>
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--drawer-card-border)' }}>
+            <h2 className="font-display font-semibold text-base text-os-fg">
+              {WORKOUT_EMOJIS[workoutType] || '🏋️'} {workoutType} Day
+            </h2>
+            <button onClick={onClose} className="p-1.5 rounded-lg text-os-muted hover:text-os-fg transition-colors">
+              <i className="ti ti-x text-lg" />
+            </button>
+          </div>
+
+          {/* Transfer banner */}
+          {showTransferBanner && (
+            <div className="mx-4 mt-3 flex-shrink-0 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-body text-os-secondary flex-1">
+                  ↔️ You have a <span className="font-semibold text-os-fg">{fromType}</span> session from today. Move it here?
+                </p>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={handleTransfer}
+                    disabled={transferring}
+                    className="text-xs font-body font-semibold px-2.5 py-1.5 rounded-lg transition-opacity disabled:opacity-60"
+                    style={{ background: 'rgba(99,102,241,0.18)', color: '#818CF8', border: '1px solid rgba(99,102,241,0.35)' }}
+                  >
+                    {transferring ? '…' : 'Transfer'}
+                  </button>
+                  <button
+                    onClick={() => setShowTransferBanner(false)}
+                    className="text-xs font-body text-os-muted hover:text-os-fg transition-colors px-1"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
             </div>
-          ) : exercises.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3">
-              <i className="ti ti-dumbbell text-3xl text-os-muted" />
-              <span className="text-sm font-body text-os-muted text-center px-8">
-                No exercises yet. Add one below to start tracking sets.
-              </span>
-            </div>
-          ) : (
-            exercises.map(ex => (
-              <ExerciseCard
-                key={ex.id}
-                exercise={ex}
-                logs={logs[ex.id] || []}
-                expanded={expandedId === ex.id}
-                onToggle={() => setExpandedId(prev => prev === ex.id ? null : ex.id)}
-                onCollapse={() => setExpandedId(prev => prev === ex.id ? null : prev)}
-                onLogSave={entry => handleLogSave(ex.id, entry)}
-                onOpenGraph={() => setGraphExercise(ex)}
-                onDelete={() => handleDeleteClick(ex)}
-                onAddTag={handleAddTag}
-              />
-            ))
           )}
-        </div>
 
-        {/* Bottom bar */}
-        <div className="flex-shrink-0 px-4 pb-6 pt-3 flex gap-3" style={{ borderTop: '1px solid var(--drawer-card-border)' }}>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-body font-medium text-os-secondary hover:text-os-fg transition-colors"
-            style={{ border: '1px solid var(--drawer-card-border)' }}
-          >
-            <i className="ti ti-plus text-base" />
-            Add exercise
-          </button>
-          <button
-            onClick={onDone}
-            className="flex-1 py-2 rounded-lg text-sm font-body font-semibold text-white transition-opacity hover:opacity-90"
-            style={{ background: '#6366F1' }}
-          >
-            Done
-          </button>
+          {/* Scrollable list */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <span className="text-sm font-body text-os-muted">Loading exercises…</span>
+              </div>
+            ) : exercises.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full gap-3">
+                <i className="ti ti-dumbbell text-3xl text-os-muted" />
+                <span className="text-sm font-body text-os-muted text-center px-8">
+                  No exercises yet. Add one below to start tracking sets.
+                </span>
+              </div>
+            ) : (
+              exercises.map(ex => (
+                <ExerciseCard
+                  key={ex.id}
+                  exercise={ex}
+                  logs={logs[ex.id] || []}
+                  expanded={expandedId === ex.id}
+                  onToggle={() => setExpandedId(prev => prev === ex.id ? null : ex.id)}
+                  onCollapse={() => setExpandedId(prev => prev === ex.id ? null : prev)}
+                  onLogSave={entry => handleLogSave(ex.id, entry)}
+                  onOpenGraph={() => setGraphExercise(ex)}
+                  onDelete={() => handleDeleteClick(ex)}
+                  onAddTag={handleAddTag}
+                />
+              ))
+            )}
+          </div>
+
+          {/* Bottom bar */}
+          <div className="flex-shrink-0 px-4 pb-6 pt-3 space-y-2" style={{ borderTop: '1px solid var(--drawer-card-border)' }}>
+            {hasTodaySession && (
+              <button
+                onClick={handleDeleteTodaySession}
+                disabled={deletingSession}
+                className="w-full py-2 rounded-lg text-sm font-body font-medium transition-all disabled:opacity-50"
+                style={{ border: '1px solid rgba(239,68,68,0.4)', color: '#EF4444', background: 'rgba(239,68,68,0.06)' }}
+              >
+                {deletingSession ? 'Deleting…' : '🗑️ Delete today\'s session'}
+              </button>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowAdd(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-body font-medium text-os-secondary hover:text-os-fg transition-colors"
+                style={{ border: '1px solid var(--drawer-card-border)' }}
+              >
+                <i className="ti ti-plus text-base" />
+                Add exercise
+              </button>
+              <button
+                onClick={onDone}
+                className="flex-1 py-2 rounded-lg text-sm font-body font-semibold text-white transition-opacity hover:opacity-90"
+                style={{ background: '#6366F1' }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
