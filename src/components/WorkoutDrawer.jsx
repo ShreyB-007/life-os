@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { normalizeExerciseName } from '../lib/exercise'
 import ExerciseCard from './ExerciseCard'
 import AddExerciseModal from './AddExerciseModal'
 import DeleteConfirmModal from './DeleteConfirmModal'
@@ -7,22 +8,23 @@ import ProgressGraph from './ProgressGraph'
 
 export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
   const [exercises, setExercises] = useState([])
-  const [logs, setLogs] = useState({})        // exercise_id → log[]  sorted desc
-  const [loading, setLoading] = useState(true)
-  const [expandedId, setExpandedId] = useState(null)
-  const [showAdd, setShowAdd] = useState(false)
+  const [logs, setLogs]           = useState({})   // exercise_id → log[] sorted desc
+  const [loading, setLoading]     = useState(true)
+  const [expandedId, setExpandedId]   = useState(null)
+  const [showAdd, setShowAdd]         = useState(false)
   const [graphExercise, setGraphExercise] = useState(null)
-  const [deleteTarget, setDeleteTarget] = useState(null)
-  const [toast, setToast] = useState(null)
+  const [deleteTarget, setDeleteTarget]   = useState(null)
+  const [toast, setToast]             = useState(null)
 
   useEffect(() => { fetchData() }, [workoutType])
 
   async function fetchData() {
     setLoading(true)
+    // Exercises are global; fetch those tagged for this workout type
     const { data: exs } = await supabase
       .from('exercises')
       .select('*')
-      .eq('workout_type', workoutType)
+      .contains('workout_type_tags', [workoutType])
       .order('created_at')
 
     if (!exs) { setLoading(false); return }
@@ -45,23 +47,38 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
   }
 
   function handleLogSave(exerciseId, entry) {
-    setLogs(prev => {
-      const existing = prev[exerciseId] || []
-      return {
-        ...prev,
-        [exerciseId]: [entry, ...existing.filter(l => l.log_date !== entry.log_date)],
-      }
-    })
+    setLogs(prev => ({
+      ...prev,
+      [exerciseId]: [entry, ...(prev[exerciseId] || []).filter(l => l.log_date !== entry.log_date)],
+    }))
   }
 
+  // Returns null on success, or a string error for AddExerciseModal
   async function handleAdd(name, weightType) {
+    const normalized = normalizeExerciseName(name)
+
+    // Check global duplicate by normalized_name
+    const { data: existing } = await supabase
+      .from('exercises')
+      .select('name')
+      .eq('normalized_name', normalized)
+      .maybeSingle()
+
+    if (existing) return `duplicate:${existing.name}`
+
     const { data, error } = await supabase
       .from('exercises')
-      .insert({ workout_type: workoutType, name, weight_type: weightType })
+      .insert({
+        name,
+        normalized_name: normalized,
+        weight_type: weightType,
+        primary_workout_type: workoutType,
+        workout_type_tags: [workoutType],
+      })
       .select()
       .single()
 
-    if (error) return error.code === '23505' ? 'duplicate' : 'error'
+    if (error) return 'error'
 
     setExercises(prev => [...prev, data])
     setLogs(prev => ({ ...prev, [data.id]: [] }))
@@ -77,12 +94,25 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
     showToast(`${exercise.name} deleted`)
   }
 
+  async function handleAddTag(exerciseId, type) {
+    const exercise = exercises.find(e => e.id === exerciseId)
+    if (!exercise) return
+    const newTags = [...(exercise.workout_type_tags || []), type]
+    const { error } = await supabase
+      .from('exercises')
+      .update({ workout_type_tags: newTags })
+      .eq('id', exerciseId)
+    if (!error) {
+      setExercises(prev => prev.map(e => e.id === exerciseId ? { ...e, workout_type_tags: newTags } : e))
+      showToast(`${exercise.name} added to ${type} day`)
+    }
+  }
+
   function showToast(msg) {
     setToast(msg)
     setTimeout(() => setToast(null), 3000)
   }
 
-  // Prevent background scroll while drawer is open
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = '' }
@@ -100,41 +130,23 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
       {/* Drawer */}
       <div
         className="fixed bottom-0 left-0 right-0 rounded-t-2xl flex flex-col animate-slide-up-drawer"
-        style={{
-          zIndex: 101,
-          height: '75vh',
-          background: 'var(--drawer-bg)',
-          borderTop: '1px solid var(--drawer-card-border)',
-          borderLeft: '1px solid var(--drawer-card-border)',
-          borderRight: '1px solid var(--drawer-card-border)',
-        }}
+        style={{ zIndex: 101, height: '75vh', background: 'var(--drawer-bg)', borderTop: '1px solid var(--drawer-card-border)', borderLeft: '1px solid var(--drawer-card-border)', borderRight: '1px solid var(--drawer-card-border)' }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Handle bar */}
+        {/* Handle */}
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
-          <div
-            className="w-10 h-1 rounded-full"
-            style={{ background: 'var(--drawer-card-border)' }}
-          />
+          <div className="w-10 h-1 rounded-full" style={{ background: 'var(--drawer-card-border)' }} />
         </div>
 
         {/* Header */}
-        <div
-          className="flex items-center justify-between px-5 py-3 flex-shrink-0"
-          style={{ borderBottom: '1px solid var(--drawer-card-border)' }}
-        >
-          <h2 className="font-display font-semibold text-base text-os-fg">
-            {workoutType} Day
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-os-muted hover:text-os-fg transition-colors"
-          >
+        <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--drawer-card-border)' }}>
+          <h2 className="font-display font-semibold text-base text-os-fg">{workoutType} Day</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-os-muted hover:text-os-fg transition-colors">
             <i className="ti ti-x text-lg" />
           </button>
         </div>
 
-        {/* Scrollable exercise list */}
+        {/* Scrollable list */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
           {loading ? (
             <div className="flex items-center justify-center h-full">
@@ -159,16 +171,14 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
                 onLogSave={entry => handleLogSave(ex.id, entry)}
                 onOpenGraph={() => setGraphExercise(ex)}
                 onDelete={() => setDeleteTarget(ex)}
+                onAddTag={handleAddTag}
               />
             ))
           )}
         </div>
 
-        {/* Pinned bottom bar */}
-        <div
-          className="flex-shrink-0 px-4 pb-6 pt-3 flex gap-3"
-          style={{ borderTop: '1px solid var(--drawer-card-border)' }}
-        >
+        {/* Bottom bar */}
+        <div className="flex-shrink-0 px-4 pb-6 pt-3 flex gap-3" style={{ borderTop: '1px solid var(--drawer-card-border)' }}>
           <button
             onClick={() => setShowAdd(true)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-body font-medium text-os-secondary hover:text-os-fg transition-colors"
@@ -187,7 +197,6 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
         </div>
       </div>
 
-      {/* Modals (z-index above drawer) */}
       {showAdd && (
         <AddExerciseModal
           workoutType={workoutType}
@@ -212,7 +221,6 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
         />
       )}
 
-      {/* Toast */}
       {toast && (
         <div
           className="fixed bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg text-sm font-body text-white shadow-lg whitespace-nowrap animate-slide-up-fade"

@@ -9,10 +9,10 @@ const WEIGHT_TYPES = [
 ]
 
 export default function AddExerciseModal({ workoutType, onAdd, onClose }) {
-  const [name, setName] = useState('')
+  const [name, setName]           = useState('')
   const [weightType, setWeightType] = useState('barbell')
-  const [error, setError] = useState(null)
-  const [saving, setSaving] = useState(false)
+  const [error, setError]         = useState(null)
+  const [saving, setSaving]       = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -22,43 +22,33 @@ export default function AddExerciseModal({ workoutType, onAdd, onClose }) {
     setError(null)
     const result = await onAdd(trimmed, weightType)
     setSaving(false)
-    if (result === 'duplicate') {
-      setError(`This exercise already exists in ${workoutType}`)
-    } else if (result === 'error') {
-      setError('Something went wrong. Try again.')
-    } else {
+    if (!result) {
       onClose()
+    } else if (result.startsWith('duplicate:')) {
+      const existingName = result.slice('duplicate:'.length)
+      setError(`This exercise already exists (saved as "${existingName}")`)
+    } else {
+      setError('Something went wrong. Try again.')
     }
   }
 
   return (
     <>
-      <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-        style={{ zIndex: 300 }}
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" style={{ zIndex: 300 }} onClick={onClose} />
       <div
         className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl p-5 w-full max-w-sm mx-4"
         style={{ zIndex: 301, background: 'var(--drawer-bg)', border: '1px solid var(--drawer-card-border)' }}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display font-semibold text-sm text-os-fg">
-            Add exercise — {workoutType}
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md text-os-muted hover:text-os-fg transition-colors"
-          >
+          <h3 className="font-display font-semibold text-sm text-os-fg">Add exercise — {workoutType}</h3>
+          <button onClick={onClose} className="p-1.5 rounded-md text-os-muted hover:text-os-fg transition-colors">
             <i className="ti ti-x text-base" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-xs font-body text-os-muted block mb-1.5">
-              Exercise name
-            </label>
+            <label className="text-xs font-body text-os-muted block mb-1.5">Exercise name</label>
             <input
               type="text"
               value={name}
@@ -70,9 +60,7 @@ export default function AddExerciseModal({ workoutType, onAdd, onClose }) {
           </div>
 
           <div>
-            <label className="text-xs font-body text-os-muted block mb-1.5">
-              Tracking type
-            </label>
+            <label className="text-xs font-body text-os-muted block mb-1.5">Tracking type</label>
             <div className="grid grid-cols-3 gap-1.5">
               {WEIGHT_TYPES.map(wt => (
                 <button
@@ -96,9 +84,7 @@ export default function AddExerciseModal({ workoutType, onAdd, onClose }) {
             </div>
           </div>
 
-          {error && (
-            <p className="text-xs font-body text-red-500">{error}</p>
-          )}
+          {error && <p className="text-xs font-body text-red-500">{error}</p>}
 
           <button
             type="submit"

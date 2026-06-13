@@ -115,14 +115,15 @@ on conflict do nothing;
 -- Phase 2: Gym Workout Tracker
 -- ============================================================
 
--- exercises table (exercise library per workout type)
+-- exercises table (global library; workout_type_tags controls which drawers show it)
 create table if not exists exercises (
   id uuid primary key default gen_random_uuid(),
-  workout_type text not null,
   name text not null,
+  normalized_name text not null unique,
   weight_type text not null check (weight_type in ('barbell', 'dumbbell', 'cable', 'reps', 'time')),
-  created_at timestamptz default now(),
-  unique(workout_type, name)
+  primary_workout_type text not null,
+  workout_type_tags text[] not null default '{}',
+  created_at timestamptz default now()
 );
 
 -- exercise_logs table (one row per exercise per day)
