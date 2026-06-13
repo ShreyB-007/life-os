@@ -2,6 +2,7 @@ import { useState, useEffect, forwardRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayStr } from '../lib/date'
 import StreakDisplay from './StreakDisplay'
+import WorkoutDrawer from './WorkoutDrawer'
 
 const WORKOUT_TYPES = [
   { key: 'Push', subtitle: 'Chest · Sho · Tri' },
@@ -23,6 +24,8 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
   const [isRest, setIsRest] = useState(false)
   const [saving, setSaving] = useState(false)
   const [booped, setBooped] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerWorkoutType, setDrawerWorkoutType] = useState(null)
 
   useEffect(() => {
     if (todayLog) {
@@ -76,6 +79,8 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     setIsRest(false)
     save(type, false, true)
     if (!wasAlreadyDone) triggerBoop()
+    setDrawerWorkoutType(type)
+    setDrawerOpen(true)
   }
 
   function markRest() {
@@ -92,80 +97,109 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     setTimeout(() => setBooped(true), 10)
   }
 
+  function openDrawerManually() {
+    setDrawerWorkoutType(selected)
+    setDrawerOpen(true)
+  }
+
   return (
-    <div
-      ref={ref}
-      className={[
-        'relative overflow-hidden rounded-xl transition-all duration-200 habit-gym',
-        isDone ? 'habit-card-done' : 'habit-card card-interactive',
-        booped && isDone ? 'animate-boop' : '',
-      ].join(' ')}
-    >
-      {/* Left accent bar */}
+    <>
       <div
-        className="card-accent-bar"
-        style={{ backgroundColor: isDone ? '#10b981' : '#6366F1' }}
-      />
+        ref={ref}
+        className={[
+          'relative overflow-hidden rounded-xl transition-all duration-200 habit-gym',
+          isDone ? 'habit-card-done' : 'habit-card card-interactive',
+          booped && isDone ? 'animate-boop' : '',
+        ].join(' ')}
+      >
+        {/* Left accent bar */}
+        <div
+          className="card-accent-bar"
+          style={{ backgroundColor: isDone ? '#10b981' : '#6366F1' }}
+        />
 
-      <div className="p-4 pl-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <i className="ti ti-barbell text-lg" style={{ color: '#6366F1' }} />
-            <span className="font-display font-semibold text-sm text-os-fg">Gym</span>
+        <div className="p-4 pl-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <i className="ti ti-barbell text-lg" style={{ color: '#6366F1' }} />
+              <span className="font-display font-semibold text-sm text-os-fg">Gym</span>
+            </div>
+            <StreakDisplay count={streak} flash={booped} />
           </div>
-          <StreakDisplay count={streak} flash={booped} />
-        </div>
 
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          {WORKOUT_TYPES.map(({ key, subtitle }) => {
-            const active = selected === key
-            return (
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {WORKOUT_TYPES.map(({ key, subtitle }) => {
+              const active = selected === key
+              return (
+                <button
+                  key={key}
+                  onClick={() => selectWorkout(key)}
+                  className={[
+                    'flex flex-col items-start px-3 py-2.5 rounded-lg text-left',
+                    active ? '' : 'gym-type-btn',
+                  ].join(' ')}
+                  style={active ? {
+                    background: 'rgba(99,102,241,0.12)',
+                    border: '1px solid rgba(99,102,241,0.45)',
+                    color: '#818CF8',
+                    transition: 'all 150ms ease',
+                  } : undefined}
+                >
+                  <span className="text-sm font-body font-medium">{key}</span>
+                  <span className="text-[11px] font-body mt-0.5 text-os-muted">{subtitle}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col items-start gap-0.5">
               <button
-                key={key}
-                onClick={() => selectWorkout(key)}
+                onClick={markRest}
+                disabled={restLimitReached}
                 className={[
-                  'flex flex-col items-start px-3 py-2.5 rounded-lg text-left',
-                  active ? '' : 'gym-type-btn',
+                  'text-xs font-body px-2.5 py-1 rounded gym-rest-btn',
+                  restLimitReached ? 'is-disabled' : isRest ? 'is-active' : '',
                 ].join(' ')}
-                style={active ? {
-                  background: 'rgba(99,102,241,0.12)',
-                  border: '1px solid rgba(99,102,241,0.45)',
-                  color: '#818CF8',
-                  transition: 'all 150ms ease',
-                } : undefined}
               >
-                <span className="text-sm font-body font-medium">{key}</span>
-                <span className="text-[11px] font-body mt-0.5 text-os-muted">{subtitle}</span>
+                {restLimitReached ? 'Rest limit reached' : 'Rest day'}
               </button>
-            )
-          })}
-        </div>
+              {weekRestCount === 1 && !restLimitReached && (
+                <span className="text-[10px] font-body" style={{ color: '#F59E0B' }}>
+                  1 of 2 rest days used
+                </span>
+              )}
+            </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col items-start gap-0.5">
-            <button
-              onClick={markRest}
-              disabled={restLimitReached}
-              className={[
-                'text-xs font-body px-2.5 py-1 rounded gym-rest-btn',
-                restLimitReached ? 'is-disabled' : isRest ? 'is-active' : '',
-              ].join(' ')}
-            >
-              {restLimitReached ? 'Rest limit reached' : 'Rest day'}
-            </button>
-            {weekRestCount === 1 && !restLimitReached && (
-              <span className="text-[10px] font-body" style={{ color: '#F59E0B' }}>1 of 2 rest days used</span>
-            )}
+            <div className="flex items-center gap-2">
+              <span
+                className="text-xs font-body"
+                style={{ color: isDone ? '#10b981' : 'var(--os-muted)' }}
+              >
+                {isRest ? 'Rest day — streak saved' : selected ? `Done — ${selected}` : 'Select workout'}
+              </span>
+              {selected && !isRest && (
+                <button
+                  onClick={openDrawerManually}
+                  className="p-1 rounded text-os-muted hover:text-os-fg transition-colors"
+                  title="Open workout log"
+                >
+                  <i className="ti ti-chevron-up text-sm" />
+                </button>
+              )}
+            </div>
           </div>
-          <span
-            className="text-xs font-body"
-            style={{ color: isDone ? '#10b981' : 'var(--os-muted)' }}
-          >
-            {isRest ? 'Rest day — streak saved' : selected ? `Done — ${selected}` : 'Select workout'}
-          </span>
         </div>
       </div>
-    </div>
+
+      {drawerOpen && drawerWorkoutType && (
+        <WorkoutDrawer
+          workoutType={drawerWorkoutType}
+          onClose={() => setDrawerOpen(false)}
+          onDone={() => setDrawerOpen(false)}
+        />
+      )}
+    </>
   )
 })
 

@@ -110,3 +110,27 @@ values
   ('Masters research',  'school',            '#3B6D11', 2,  null,         'starting',   'active', 3),
   ('Research paper',    'file-text',         '#854F0B', 5,  '2026-11-30', 'Nov 30',     'active', 4)
 on conflict do nothing;
+
+-- ============================================================
+-- Phase 2: Gym Workout Tracker
+-- ============================================================
+
+-- exercises table (exercise library per workout type)
+create table if not exists exercises (
+  id uuid primary key default gen_random_uuid(),
+  workout_type text not null,
+  name text not null,
+  weight_type text not null check (weight_type in ('barbell', 'dumbbell', 'cable', 'reps', 'time')),
+  created_at timestamptz default now(),
+  unique(workout_type, name)
+);
+
+-- exercise_logs table (one row per exercise per day)
+create table if not exists exercise_logs (
+  id uuid primary key default gen_random_uuid(),
+  exercise_id uuid not null references exercises(id) on delete cascade,
+  log_date date not null default current_date,
+  sets jsonb not null default '[]',
+  logged_at timestamptz default now(),
+  unique(exercise_id, log_date)
+);

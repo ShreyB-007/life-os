@@ -85,6 +85,10 @@ export default {
           '0%':   { backgroundPosition: '0% center' },
           '100%': { backgroundPosition: '300% center' },
         },
+        'slide-up-drawer': {
+          '0%':   { transform: 'translateY(100%)' },
+          '100%': { transform: 'translateY(0)' },
+        },
       },
       animation: {
         'pulse-warm':      'pulse-streak 2s ease-in-out infinite',
@@ -100,6 +104,7 @@ export default {
         'bar-shine':           'bar-shine 1.2s ease forwards',
         'banner-shimmer':      'banner-shimmer 1.5s ease 1 forwards',
         'cosmic-text-shift':   'cosmic-text-shift 3.5s linear infinite',
+        'slide-up-drawer':     'slide-up-drawer 300ms cubic-bezier(0.32, 0.72, 0, 1) both',
       },
     },
   },

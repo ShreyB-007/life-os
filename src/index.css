@@ -87,6 +87,13 @@
   --input-border:       rgba(0, 0, 0, 0.10);
   --input-hover-bg:     rgba(99, 102, 241, 0.06);
   --input-hover-border: rgba(99, 102, 241, 0.25);
+
+  /* Workout drawer */
+  --drawer-bg: #FFFFFF;
+  --drawer-card-bg: #FAFAFA;
+  --drawer-card-bg-exp: #F1F1F8;
+  --drawer-card-border: rgba(0, 0, 0, 0.08);
+  --drawer-ref-bg: rgba(0, 0, 0, 0.04);
 }
 
 html.dark {
@@ -105,6 +112,13 @@ html.dark {
   --input-border:       rgba(255, 255, 255, 0.09);
   --input-hover-bg:     rgba(99, 102, 241, 0.10);
   --input-hover-border: rgba(99, 102, 241, 0.30);
+
+  /* Workout drawer */
+  --drawer-bg: #0F0F1A;
+  --drawer-card-bg: rgba(20, 20, 40, 0.6);
+  --drawer-card-bg-exp: #141428;
+  --drawer-card-border: #1C1C2E;
+  --drawer-ref-bg: rgba(255, 255, 255, 0.03);
 }
 
 @layer base {
@@ -357,6 +371,29 @@ html.dark .nav-link-hover:hover {
   animation: bar-shine 1.2s ease forwards;
   pointer-events: none;
   border-radius: inherit;
+}
+
+/* ─── Workout drawer inputs ──────────────────────────── */
+.drawer-input {
+  border: 1px solid var(--drawer-card-border);
+  background: var(--drawer-card-bg);
+  color: var(--os-fg);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  outline: none;
+  transition: border-color 150ms ease;
+}
+
+.drawer-input:focus {
+  border-color: rgba(99, 102, 241, 0.5);
+}
+
+.drawer-input::-webkit-inner-spin-button,
+.drawer-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* ─── Banner shimmer (one-shot after slide-down) ────── */
