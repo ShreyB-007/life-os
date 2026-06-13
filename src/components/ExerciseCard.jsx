@@ -6,9 +6,11 @@
  * - Mini-plates capped at 2 with inline note
  * - Time auto-converts SS>=60 into minutes; caps at 59m 59s
  * - Workout-type tag affordance lets exercise appear in other drawers
- * - Stale-closure guard via functional state updates throughout
+ * - Fix 1: Tag picker dropdown via React portal to avoid overflow:hidden clipping
+ * - Fix 3: Barbell/dumbbell weight in multiples of 2.5; auto-round on blur; ▲/▼ step buttons
  */
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { todayStr } from '../lib/date'
 import { ALL_WORKOUT_TYPES } from '../lib/exercise'
@@ -83,30 +85,45 @@ function emptySetRow(wt) {
   return { mins: '', secs: '' }
 }
 
+function roundTo2p5(val) {
+  return Math.round(val / 2.5) * 2.5
+}
+
+function isMultipleOf2p5(val) {
+  return Math.abs(roundTo2p5(val) - val) < 0.001
+}
+
 function validateSet(set, wt) {
   const errors = {}
   if (wt === 'barbell' || wt === 'dumbbell') {
-    const w = parseInt(set.weight), r = parseInt(set.reps)
-    if (isNaN(w) || w < 1) errors.weight = 'Weight must be at least 1'
-    if (isNaN(r) || r < 1) errors.reps   = 'Reps must be at least 1'
+    const w = parseFloat(set.weight)
+    const r = parseInt(set.reps)
+    if (isNaN(w) || w < 2.5)       errors.weight = 'Min 2.5 kg'
+    else if (!isMultipleOf2p5(w))  errors.weight = 'Must be a multiple of 2.5 kg'
+    if (isNaN(r) || r < 1)         errors.reps   = 'Reps must be at least 1'
   } else if (wt === 'cable') {
     const p = parseInt(set.plates), m = parseInt(set.mini), r = parseInt(set.reps)
-    if (isNaN(p) || p < 1)              errors.plates = 'Plates must be at least 1'
-    if (isNaN(m) || m < 0)              errors.mini   = 'Min 0'
-    else if (m > 2)                     errors.mini   = 'Max 2 mini-plates'
-    if (isNaN(r) || r < 1)             errors.reps   = 'Reps must be at least 1'
+    if (isNaN(p) || p < 1)         errors.plates = 'Plates must be at least 1'
+    if (isNaN(m) || m < 0)         errors.mini   = 'Min 0'
+    else if (m > 2)                 errors.mini   = 'Max 2 mini-plates'
+    if (isNaN(r) || r < 1)         errors.reps   = 'Reps must be at least 1'
   } else if (wt === 'reps') {
     const r = parseInt(set.reps)
-    if (isNaN(r) || r < 1) errors.reps = 'Reps must be at least 1'
+    if (isNaN(r) || r < 1)         errors.reps   = 'Reps must be at least 1'
   } else if (wt === 'time') {
     const total = (parseInt(set.mins) || 0) * 60 + (parseInt(set.secs) || 0)
-    if (total <= 0) errors.mins = 'Duration must be greater than 0'
+    if (total <= 0)                 errors.mins   = 'Duration must be greater than 0'
   }
   return errors
 }
 
 function stripInt(val) {
   return val.replace(/[^0-9]/g, '')
+}
+
+function stripWeight(val) {
+  // Allow digits and one decimal point only
+  return val.replace(/[^0-9.]/g, '').replace(/^(\d*\.?\d*).*$/, '$1')
 }
 
 export default function ExerciseCard({
@@ -116,20 +133,23 @@ export default function ExerciseCard({
   const today = todayStr()
   const wt = exercise.weight_type
 
-  const todayLog  = logs.find(l => l.log_date === today)  ?? null
-  const lastLog   = logs.find(l => l.log_date !== today)  ?? null
+  const todayLog   = logs.find(l => l.log_date === today) ?? null
+  const lastLog    = logs.find(l => l.log_date !== today) ?? null
   const mostRecent = logs[0] ?? null
 
-  const [sets, setSets]               = useState(() => setsFromLog(todayLog, wt))
-  const [saved, setSaved]             = useState(!!todayLog)
-  const [saving, setSaving]           = useState(false)
-  const [touched, setTouched]         = useState(new Set())
+  const [sets, setSets]                       = useState(() => setsFromLog(todayLog, wt))
+  const [saved, setSaved]                     = useState(!!todayLog)
+  const [saving, setSaving]                   = useState(false)
+  const [touched, setTouched]                 = useState(new Set())
   const [submitAttempted, setSubmitAttempted] = useState(false)
   const [showTagPicker, setShowTagPicker]     = useState(false)
-  const [miniNote, setMiniNote]       = useState(null)   // { setIdx }
-  const [timeCapNote, setTimeCapNote] = useState(false)
+  const [tagDropdownPos, setTagDropdownPos]   = useState(null)
+  const [miniNote, setMiniNote]               = useState(null)
+  const [timeCapNote, setTimeCapNote]         = useState(false)
+  const [weightNotes, setWeightNotes]         = useState(new Set())
 
-  const tagPickerRef = useRef(null)
+  const tagBtnRef      = useRef(null)
+  const tagDropdownRef = useRef(null)
 
   useEffect(() => {
     setSets(setsFromLog(todayLog, wt))
@@ -138,13 +158,12 @@ export default function ExerciseCard({
     setSubmitAttempted(false)
   }, [todayLog?.log_date])
 
-  // Close tag picker on outside click
   useEffect(() => {
     if (!showTagPicker) return
     function onOutside(e) {
-      if (tagPickerRef.current && !tagPickerRef.current.contains(e.target)) {
-        setShowTagPicker(false)
-      }
+      if (tagBtnRef.current?.contains(e.target)) return
+      if (tagDropdownRef.current?.contains(e.target)) return
+      setShowTagPicker(false)
     }
     document.addEventListener('mousedown', onOutside)
     return () => document.removeEventListener('mousedown', onOutside)
@@ -157,16 +176,12 @@ export default function ExerciseCard({
     : `${days} days ago`
   const daysWarning = days !== null && days >= 14
 
-  const setErrors     = sets.map(s => validateSet(s, wt))
-  const formValid     = setErrors.every(e => Object.keys(e).length === 0)
+  const setErrors      = sets.map(s => validateSet(s, wt))
+  const formValid      = setErrors.every(e => Object.keys(e).length === 0)
   const showBlockStyle = submitAttempted && !formValid
 
   function isTouched(setIdx, field) {
     return touched.has(`${setIdx}-${field}`) || submitAttempted
-  }
-
-  function hasError(setIdx, field) {
-    return isTouched(setIdx, field) && !!setErrors[setIdx]?.[field]
   }
 
   function borderColor(setIdx, field) {
@@ -190,6 +205,34 @@ export default function ExerciseCard({
 
   function handleIntInput(idx, field, raw) {
     updateSet(idx, field, stripInt(raw))
+  }
+
+  function handleWeightInput(idx, raw) {
+    updateSet(idx, 'weight', stripWeight(raw))
+  }
+
+  function handleWeightBlur(idx) {
+    touchField(idx, 'weight')
+    const raw = sets[idx].weight
+    const val = parseFloat(raw)
+    let rounded
+    if (!raw || isNaN(val) || val <= 0) {
+      rounded = 2.5
+    } else {
+      rounded = Math.max(2.5, roundTo2p5(val))
+    }
+    if (!raw || Math.abs(rounded - (isNaN(val) ? 0 : val)) > 0.001) {
+      updateSet(idx, 'weight', String(rounded))
+      setWeightNotes(prev => new Set([...prev, idx]))
+      setTimeout(() => setWeightNotes(prev => { const n = new Set(prev); n.delete(idx); return n }), 2500)
+    }
+  }
+
+  function adjustWeight(idx, delta) {
+    const cur = parseFloat(sets[idx].weight) || 0
+    const next = Math.max(2.5, roundTo2p5(cur + delta))
+    updateSet(idx, 'weight', String(next))
+    touchField(idx, 'weight')
   }
 
   function handleMiniInput(idx, raw) {
@@ -249,7 +292,7 @@ export default function ExerciseCard({
 
   function buildPayload() {
     return sets.map(s => {
-      if (wt === 'barbell' || wt === 'dumbbell') return { weight: parseInt(s.weight) || 0, reps: parseInt(s.reps) || 0 }
+      if (wt === 'barbell' || wt === 'dumbbell') return { weight: parseFloat(s.weight) || 0, reps: parseInt(s.reps) || 0 }
       if (wt === 'cable') return { plates: parseInt(s.plates) || 0, mini: parseInt(s.mini) || 0, reps: parseInt(s.reps) || 0 }
       if (wt === 'reps') return { reps: parseInt(s.reps) || 0 }
       return { duration: (parseInt(s.mins) || 0) * 60 + (parseInt(s.secs) || 0) }
@@ -267,6 +310,14 @@ export default function ExerciseCard({
     await supabase.from('exercise_logs').upsert(entry, { onConflict: 'exercise_id,log_date' })
     setSaving(false)
     setTimeout(() => onCollapse(), 1500)
+  }
+
+  function openTagPicker(e) {
+    e.stopPropagation()
+    if (showTagPicker) { setShowTagPicker(false); return }
+    const rect = tagBtnRef.current.getBoundingClientRect()
+    setTagDropdownPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+    setShowTagPicker(true)
   }
 
   const availableTags = ALL_WORKOUT_TYPES.filter(t => !(exercise.workout_type_tags || []).includes(t))
@@ -291,37 +342,16 @@ export default function ExerciseCard({
         </div>
 
         <div className="flex items-center gap-0.5 flex-shrink-0 ml-2">
-          {/* Tag add button */}
           {availableTags.length > 0 && (
-            <div className="relative" ref={tagPickerRef}>
-              <button
-                onClick={e => { e.stopPropagation(); setShowTagPicker(v => !v) }}
-                className="p-2 rounded-md text-os-muted hover:text-os-indigo transition-colors"
-                title="Also show in another workout type"
-              >
-                <i className="ti ti-tag-plus text-sm" />
-              </button>
-              {showTagPicker && (
-                <div
-                  className="absolute right-0 top-9 rounded-lg shadow-lg p-1 z-10 min-w-[130px]"
-                  style={{ background: 'var(--drawer-bg)', border: '1px solid var(--drawer-card-border)' }}
-                  onClick={e => e.stopPropagation()}
-                >
-                  <p className="text-[10px] font-body text-os-muted px-2 py-1 uppercase tracking-wide">Also show in</p>
-                  {availableTags.map(type => (
-                    <button
-                      key={type}
-                      onClick={e => { e.stopPropagation(); onAddTag(exercise.id, type); setShowTagPicker(false) }}
-                      className="w-full text-left text-xs font-body px-2 py-1.5 rounded hover:text-os-fg text-os-secondary transition-colors"
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <button
+              ref={tagBtnRef}
+              onClick={openTagPicker}
+              className="p-2 rounded-md text-os-muted hover:text-os-indigo transition-colors"
+              title="Also show in another workout type"
+            >
+              <i className="ti ti-tag-plus text-sm" />
+            </button>
           )}
-
           <button
             onClick={e => { e.stopPropagation(); onOpenGraph() }}
             className="p-2 rounded-md text-os-muted hover:text-os-indigo transition-colors"
@@ -343,7 +373,6 @@ export default function ExerciseCard({
       {/* Expanded content */}
       {expanded && (
         <div className="px-4 pb-4 border-t" style={{ borderColor: 'var(--drawer-card-border)' }}>
-          {/* Last session reference */}
           {lastLog && (
             <div className="mt-3 mb-3 px-3 py-2 rounded-lg" style={{ background: 'var(--drawer-ref-bg)' }}>
               <p className="text-xs font-body text-os-muted">
@@ -353,7 +382,6 @@ export default function ExerciseCard({
             </div>
           )}
 
-          {/* Cable column headers */}
           {wt === 'cable' && (
             <div className="flex items-center gap-2 mb-1 mt-3">
               <span className="w-10 flex-shrink-0" />
@@ -364,11 +392,11 @@ export default function ExerciseCard({
             </div>
           )}
 
-          {/* Set rows */}
           <div className={['space-y-2', wt !== 'cable' ? 'mt-3' : ''].join(' ')}>
             {sets.map((set, i) => {
               const errs = setErrors[i]
               const firstErr = Object.entries(errs).find(([f]) => isTouched(i, f) && errs[f])
+              const showingWeightNote = weightNotes.has(i)
               return (
                 <div key={i}>
                   <div className="flex items-center gap-2">
@@ -376,21 +404,35 @@ export default function ExerciseCard({
 
                     {(wt === 'barbell' || wt === 'dumbbell') && (
                       <>
-                        <input
-                          type="text" inputMode="numeric" placeholder="kg"
-                          value={set.weight}
-                          onChange={e => handleIntInput(i, 'weight', e.target.value)}
-                          onBlur={() => touchField(i, 'weight')}
-                          className="drawer-input w-20"
-                          style={{ borderColor: borderColor(i, 'weight') }}
-                        />
+                        <div className="flex items-center gap-0.5">
+                          <input
+                            type="text" inputMode="decimal" placeholder="kg"
+                            value={set.weight}
+                            onChange={e => handleWeightInput(i, e.target.value)}
+                            onBlur={() => handleWeightBlur(i)}
+                            className="drawer-input w-16"
+                            style={{ borderColor: borderColor(i, 'weight') }}
+                          />
+                          <div className="flex flex-col ml-0.5">
+                            <button
+                              type="button"
+                              onClick={e => { e.stopPropagation(); adjustWeight(i, 2.5) }}
+                              className="text-[9px] text-os-muted hover:text-os-fg leading-none px-0.5 py-px select-none"
+                            >▲</button>
+                            <button
+                              type="button"
+                              onClick={e => { e.stopPropagation(); adjustWeight(i, -2.5) }}
+                              className="text-[9px] text-os-muted hover:text-os-fg leading-none px-0.5 py-px select-none"
+                            >▼</button>
+                          </div>
+                        </div>
                         <span className="text-xs text-os-muted select-none">×</span>
                         <input
                           type="text" inputMode="numeric" placeholder="reps"
                           value={set.reps}
                           onChange={e => handleIntInput(i, 'reps', e.target.value)}
                           onBlur={() => touchField(i, 'reps')}
-                          className="drawer-input w-20"
+                          className="drawer-input w-16"
                           style={{ borderColor: borderColor(i, 'reps') }}
                         />
                       </>
@@ -458,11 +500,13 @@ export default function ExerciseCard({
                     )}
                   </div>
 
-                  {/* Inline error for this set row */}
+                  {showingWeightNote && (
+                    <p className="text-[11px] font-body text-amber-500 ml-12 mt-0.5">Rounded to nearest 2.5 kg</p>
+                  )}
                   {miniNote?.setIdx === i && (
                     <p className="text-[11px] font-body text-amber-500 ml-12 mt-0.5">Max 2 mini-plates</p>
                   )}
-                  {firstErr && (
+                  {firstErr && !showingWeightNote && (
                     <p className="text-[11px] font-body text-red-500 ml-12 mt-0.5">{firstErr[1]}</p>
                   )}
                 </div>
@@ -470,12 +514,10 @@ export default function ExerciseCard({
             })}
           </div>
 
-          {/* Time cap note */}
           {timeCapNote && (
             <p className="text-[11px] font-body text-amber-500 mt-1 ml-12">Maximum duration is 60 minutes</p>
           )}
 
-          {/* Add / remove set */}
           <div className="flex gap-4 mt-3">
             <button
               onClick={removeSet}
@@ -489,7 +531,6 @@ export default function ExerciseCard({
             </button>
           </div>
 
-          {/* Log button */}
           <button
             onClick={handleLog}
             disabled={saving}
@@ -511,6 +552,36 @@ export default function ExerciseCard({
             {saving ? 'Saving…' : saved ? '✓ Logged' : showBlockStyle ? 'Fix errors above' : 'Log workout'}
           </button>
         </div>
+      )}
+
+      {/* Tag picker — portal-mounted to escape overflow:hidden on ancestor containers */}
+      {showTagPicker && tagDropdownPos && createPortal(
+        <div
+          ref={tagDropdownRef}
+          className="rounded-lg shadow-lg p-1"
+          style={{
+            position: 'fixed',
+            top: tagDropdownPos.top,
+            right: tagDropdownPos.right,
+            zIndex: 500,
+            minWidth: 130,
+            background: 'var(--drawer-bg)',
+            border: '1px solid var(--drawer-card-border)',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          <p className="text-[10px] font-body text-os-muted px-2 py-1 uppercase tracking-wide">Also show in</p>
+          {availableTags.map(type => (
+            <button
+              key={type}
+              onClick={e => { e.stopPropagation(); onAddTag(exercise.id, type); setShowTagPicker(false) }}
+              className="w-full text-left text-xs font-body px-2 py-1.5 rounded hover:text-os-fg text-os-secondary transition-colors"
+            >
+              {type}
+            </button>
+          ))}
+        </div>,
+        document.body
       )}
     </div>
   )

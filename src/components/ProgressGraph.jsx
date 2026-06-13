@@ -116,7 +116,8 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
   const [compareMode, setCompareMode] = useState(false)
   const [hovered, setHovered]         = useState(null)  // { seriesKey, sessionIdx }
 
-  const activeSeries = compareMode ? seriesOptions.map(s => s.key) : [seriesKey]
+  // Compare mode shows only individual sets, not the Max aggregate line
+  const activeSeries = compareMode ? seriesOptions.filter(s => s.key !== 'max').map(s => s.key) : [seriesKey]
 
   // Build values per active series
   const seriesValues = {}
@@ -188,13 +189,20 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
             </div>
 
             {/* Compare toggle */}
-            <label className="flex items-center gap-1.5 cursor-pointer ml-auto">
+            <label className="flex items-center gap-1.5 cursor-pointer ml-auto flex-shrink-0">
               <span className="text-xs font-body text-os-secondary">Compare sets</span>
               <button
-                onClick={() => setCompareMode(v => !v)}
-                className={['w-8 h-4 rounded-full transition-colors relative flex-shrink-0', compareMode ? 'bg-os-indigo' : 'bg-os-muted opacity-40'].join(' ')}
+                onClick={() => {
+                  if (!compareMode && seriesKey === 'max') setSeriesKey('set0')
+                  setCompareMode(v => !v)
+                }}
+                className={['rounded-full transition-colors relative flex-shrink-0', compareMode ? 'bg-os-indigo' : 'bg-os-muted opacity-40'].join(' ')}
+                style={{ width: 44, height: 24, minWidth: 44 }}
               >
-                <span className={['absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform', compareMode ? 'translate-x-4' : 'translate-x-0.5'].join(' ')} />
+                <span
+                  className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
+                  style={{ transform: compareMode ? 'translateX(20px)' : 'translateX(2px)' }}
+                />
               </button>
             </label>
           </div>
