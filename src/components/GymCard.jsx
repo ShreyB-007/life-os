@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { todayStr } from '../lib/date'
 import StreakDisplay from './StreakDisplay'
 import WorkoutDrawer from './WorkoutDrawer'
+import HistoryDrawer from './HistoryDrawer'
 
 const WORKOUT_TYPES = [
   { key: 'Push', subtitle: 'Chest · Sho · Tri' },
@@ -20,13 +21,14 @@ function getMondayStr() {
 }
 
 const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], onLog }, ref) {
-  const [selected, setSelected]           = useState(null)
-  const [isRest, setIsRest]               = useState(false)
-  const [saving, setSaving]               = useState(false)
-  const [booped, setBooped]               = useState(false)
-  const [drawerOpen, setDrawerOpen]       = useState(false)
+  const [selected, setSelected]               = useState(null)
+  const [isRest, setIsRest]                   = useState(false)
+  const [saving, setSaving]                   = useState(false)
+  const [booped, setBooped]                   = useState(false)
+  const [drawerOpen, setDrawerOpen]           = useState(false)
   const [drawerWorkoutType, setDrawerWorkoutType] = useState(null)
-  const [checking, setChecking]           = useState(false)
+  const [historyOpen, setHistoryOpen]         = useState(false)
+  const [checking, setChecking]               = useState(false)
   const [pendingDeselect, setPendingDeselect] = useState(null)  // { type, logs }
   const [pendingSwitch, setPendingSwitch]     = useState(null)  // { fromType, toType, logs }
 
@@ -85,11 +87,53 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     return logs || []
   }
 
+  // After transferring a log from sourceType, clean up the exercise's source tag
+  // if the exercise has no prior history in source (today was its only session there).
+  async function cleanupSourceAfterTransfer(exerciseId, sourceType, targetType) {
+    const today = todayStr()
+
+    const { data: priorLogs } = await supabase
+      .from('exercise_logs')
+      .select('id')
+      .eq('exercise_id', exerciseId)
+      .lt('log_date', today)
+      .limit(1)
+
+    if (priorLogs?.length > 0) return  // Has history in source — leave it there
+
+    const { data: exercise } = await supabase
+      .from('exercises')
+      .select('id, workout_type_tags, primary_workout_type')
+      .eq('id', exerciseId)
+      .single()
+    if (!exercise) return  // Already removed
+
+    const cleanedTags = (exercise.workout_type_tags || []).filter(t => t !== sourceType)
+
+    if (cleanedTags.length === 0) {
+      // No other types in tags after removing source — check if any logs remain
+      const { data: remainingLogs } = await supabase
+        .from('exercise_logs').select('id').eq('exercise_id', exerciseId).limit(1)
+
+      if (!remainingLogs?.length) {
+        // Log was re-pointed to a matching exercise; this record is now orphaned
+        await supabase.from('exercises').delete().eq('id', exerciseId)
+      } else {
+        // Exercise carries its log to target; update its home
+        await supabase.from('exercises').update({
+          workout_type_tags: [targetType],
+          primary_workout_type: targetType,
+        }).eq('id', exerciseId)
+      }
+    } else {
+      await supabase.from('exercises').update({ workout_type_tags: cleanedTags }).eq('id', exercise.id)
+    }
+  }
+
   async function selectWorkout(type) {
     if (checking) return
 
     if (selected === type) {
-      // Deselect: tapping active type again
       setChecking(true)
       const logs = await fetchTodayLogsForType(type)
       setChecking(false)
@@ -102,7 +146,6 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     }
 
     if (selected !== null) {
-      // Switch to a different type while one is already selected
       setChecking(true)
       const logs = await fetchTodayLogsForType(selected)
       setChecking(false)
@@ -112,7 +155,6 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
       }
     }
 
-    // Fresh selection or silent switch (no exercise logs yet)
     doSelect(type)
   }
 
@@ -146,33 +188,36 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     for (const log of logs) {
       const { data: exercise } = await supabase
         .from('exercises')
-        .select('id, normalized_name, workout_type_tags')
+        .select('id, normalized_name, workout_type_tags, primary_workout_type')
         .eq('id', log.exercise_id)
         .single()
       if (!exercise) continue
 
       const tags = exercise.workout_type_tags || []
-      if (tags.includes(toType)) continue
 
-      // Check if another exercise with the same normalized name already exists in the new type
-      const { data: match } = await supabase
-        .from('exercises')
-        .select('id')
-        .eq('normalized_name', exercise.normalized_name)
-        .contains('workout_type_tags', [toType])
-        .maybeSingle()
+      if (!tags.includes(toType)) {
+        const { data: match } = await supabase
+          .from('exercises')
+          .select('id')
+          .eq('normalized_name', exercise.normalized_name)
+          .contains('workout_type_tags', [toType])
+          .maybeSingle()
 
-      if (match) {
-        // Re-point the log to the existing exercise in the new type
-        await supabase.from('exercise_logs').update({ exercise_id: match.id }).eq('id', log.id)
-      } else {
-        // Add the new type tag so this exercise appears in the new drawer
-        await supabase.from('exercises').update({ workout_type_tags: [...tags, toType] }).eq('id', exercise.id)
+        if (match) {
+          await supabase.from('exercise_logs').update({ exercise_id: match.id }).eq('id', log.id)
+        } else {
+          await supabase.from('exercises')
+            .update({ workout_type_tags: [...tags, toType] })
+            .eq('id', exercise.id)
+        }
       }
+
+      // Remove source type from this exercise if it has no prior history in source
+      await cleanupSourceAfterTransfer(exercise.id, fromType, toType)
     }
 
     setPendingSwitch(null)
-    doSelect(pendingSwitch.toType)
+    doSelect(toType)
   }
 
   function markRest() {
@@ -242,22 +287,33 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
           </div>
 
           <div className="flex items-center justify-between">
-            <div className="flex flex-col items-start gap-0.5">
+            <div className="flex items-center gap-2">
+              {/* History button */}
               <button
-                onClick={markRest}
-                disabled={restLimitReached}
-                className={[
-                  'text-xs font-body px-2.5 py-1 rounded gym-rest-btn',
-                  restLimitReached ? 'is-disabled' : isRest ? 'is-active' : '',
-                ].join(' ')}
+                onClick={() => setHistoryOpen(true)}
+                className="p-1.5 rounded-md text-os-muted hover:text-os-fg transition-colors"
+                title="View workout history"
               >
-                {restLimitReached ? 'Rest limit reached' : 'Rest day'}
+                <i className="ti ti-history text-base" />
               </button>
-              {weekRestCount === 1 && !restLimitReached && (
-                <span className="text-[10px] font-body" style={{ color: '#F59E0B' }}>
-                  1 of 2 rest days used
-                </span>
-              )}
+
+              <div className="flex flex-col items-start gap-0.5">
+                <button
+                  onClick={markRest}
+                  disabled={restLimitReached}
+                  className={[
+                    'text-xs font-body px-2.5 py-1 rounded gym-rest-btn',
+                    restLimitReached ? 'is-disabled' : isRest ? 'is-active' : '',
+                  ].join(' ')}
+                >
+                  {restLimitReached ? 'Rest limit reached' : 'Rest day'}
+                </button>
+                {weekRestCount === 1 && !restLimitReached && (
+                  <span className="text-[10px] font-body" style={{ color: '#F59E0B' }}>
+                    1 of 2 rest days used
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
@@ -285,6 +341,10 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
           onClose={() => setDrawerOpen(false)}
           onDone={() => setDrawerOpen(false)}
         />
+      )}
+
+      {historyOpen && (
+        <HistoryDrawer onClose={() => setHistoryOpen(false)} />
       )}
 
       {/* Deselect confirmation modal */}

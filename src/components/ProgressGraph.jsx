@@ -163,9 +163,9 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
 
         {/* Controls */}
         {n > 0 && (
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
+          <>
             {/* Series selector pills */}
-            <div className="flex items-center gap-1 flex-wrap">
+            <div className="flex items-center gap-1 flex-wrap mb-3">
               {seriesOptions.map(opt => (
                 <button
                   key={opt.key}
@@ -188,24 +188,43 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
               ))}
             </div>
 
-            {/* Compare toggle */}
-            <label className="flex items-center gap-1.5 cursor-pointer ml-auto flex-shrink-0">
+            {/* Compare toggle row — fully inline-styled to guarantee bounds */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 12, overflow: 'visible', marginBottom: 16 }}>
               <span className="text-xs font-body text-os-secondary">Compare sets</span>
-              <button
+              <div
                 onClick={() => {
                   if (!compareMode && seriesKey === 'max') setSeriesKey('set0')
                   setCompareMode(v => !v)
                 }}
-                className={['rounded-full transition-colors relative flex-shrink-0', compareMode ? 'bg-os-indigo' : 'bg-os-muted opacity-40'].join(' ')}
-                style={{ width: 44, height: 24, minWidth: 44 }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  width: 44,
+                  height: 24,
+                  borderRadius: 12,
+                  backgroundColor: compareMode ? '#6366F1' : '#3F3F5A',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  flexShrink: 0,
+                  transition: 'background-color 200ms ease',
+                }}
               >
-                <span
-                  className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
-                  style={{ transform: compareMode ? 'translateX(20px)' : 'translateX(2px)' }}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 2,
+                    left: compareMode ? 22 : 2,
+                    width: 20,
+                    height: 20,
+                    borderRadius: 10,
+                    backgroundColor: 'white',
+                    transition: 'left 200ms ease',
+                    pointerEvents: 'none',
+                  }}
                 />
-              </button>
-            </label>
-          </div>
+              </div>
+            </div>
+          </>
         )}
 
         {/* Graph or empty state */}
