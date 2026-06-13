@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { todayStr } from '../lib/date'
 import { normalizeExerciseName } from '../lib/exercise'
 import ExerciseCard from './ExerciseCard'
 import AddExerciseModal from './AddExerciseModal'
@@ -86,12 +87,43 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
     return null
   }
 
-  async function handleDelete(exercise) {
-    await supabase.from('exercises').delete().eq('id', exercise.id)
-    setExercises(prev => prev.filter(e => e.id !== exercise.id))
-    setLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
+  async function handleDeleteClick(exercise) {
+    const today = todayStr()
+    const { data: priorLogs } = await supabase
+      .from('exercise_logs')
+      .select('id')
+      .eq('exercise_id', exercise.id)
+      .lt('log_date', today)
+
+    const priorCount = priorLogs?.length || 0
+    const hasPriorLogs = priorCount > 0
+    const bodyText = hasPriorLogs
+      ? `This will delete today's log for ${exercise.name}. The exercise and its ${priorCount} previous session${priorCount !== 1 ? 's' : ''} will be kept.`
+      : `This will permanently remove ${exercise.name} and all its data from your library. It has no prior history.`
+
+    setDeleteTarget({ exercise, hasPriorLogs, bodyText })
+  }
+
+  async function handleDelete() {
+    const { exercise, hasPriorLogs } = deleteTarget
+    const today = todayStr()
+
+    if (!hasPriorLogs) {
+      await supabase.from('exercises').delete().eq('id', exercise.id)
+      setExercises(prev => prev.filter(e => e.id !== exercise.id))
+      setLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
+      showToast(`${exercise.name} deleted`)
+    } else {
+      await supabase.from('exercise_logs').delete()
+        .eq('exercise_id', exercise.id).eq('log_date', today)
+      setLogs(prev => ({
+        ...prev,
+        [exercise.id]: (prev[exercise.id] || []).filter(l => l.log_date !== today),
+      }))
+      showToast(`Today's ${exercise.name} log removed`)
+    }
+
     setDeleteTarget(null)
-    showToast(`${exercise.name} deleted`)
   }
 
   async function handleAddTag(exerciseId, type) {
@@ -170,7 +202,7 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
                 onCollapse={() => setExpandedId(prev => prev === ex.id ? null : prev)}
                 onLogSave={entry => handleLogSave(ex.id, entry)}
                 onOpenGraph={() => setGraphExercise(ex)}
-                onDelete={() => setDeleteTarget(ex)}
+                onDelete={() => handleDeleteClick(ex)}
                 onAddTag={handleAddTag}
               />
             ))
@@ -215,8 +247,10 @@ export default function WorkoutDrawer({ workoutType, onClose, onDone }) {
 
       {deleteTarget && (
         <DeleteConfirmModal
-          exercise={deleteTarget}
-          onConfirm={() => handleDelete(deleteTarget)}
+          exercise={deleteTarget.exercise}
+          bodyText={deleteTarget.bodyText}
+          confirmText={deleteTarget.hasPriorLogs ? "Delete today's log" : 'Delete permanently'}
+          onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
         />
       )}

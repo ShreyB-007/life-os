@@ -1,4 +1,6 @@
-export default function DeleteConfirmModal({ exercise, onConfirm, onCancel }) {
+export default function DeleteConfirmModal({ exercise, bodyText, confirmText, onConfirm, onCancel }) {
+  const defaultBody = 'This will permanently remove this exercise and all its logged sessions. This cannot be undone.'
+
   return (
     <>
       <div
@@ -14,8 +16,7 @@ export default function DeleteConfirmModal({ exercise, onConfirm, onCancel }) {
           Delete {exercise.name}?
         </h3>
         <p className="text-sm font-body text-os-secondary mb-5 leading-relaxed">
-          This will permanently remove this exercise and all its logged sessions.
-          This cannot be undone.
+          {bodyText || defaultBody}
         </p>
         <div className="flex gap-3">
           <button
@@ -29,7 +30,7 @@ export default function DeleteConfirmModal({ exercise, onConfirm, onCancel }) {
             onClick={onConfirm}
             className="flex-1 py-2 rounded-lg text-sm font-body font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors"
           >
-            Delete permanently
+            {confirmText || 'Delete permanently'}
           </button>
         </div>
       </div>
