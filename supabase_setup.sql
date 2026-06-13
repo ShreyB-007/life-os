@@ -134,3 +134,19 @@ create table if not exists exercise_logs (
   logged_at timestamptz default now(),
   unique(exercise_id, log_date)
 );
+
+-- ============================================================
+-- Row Level Security — anon full access (personal app, no auth)
+-- ============================================================
+
+alter table habits        enable row level security;
+alter table habit_logs    enable row level security;
+alter table goals         enable row level security;
+alter table exercises     enable row level security;
+alter table exercise_logs enable row level security;
+
+create policy "anon_all_habits"        on habits        for all to anon using (true) with check (true);
+create policy "anon_all_habit_logs"    on habit_logs    for all to anon using (true) with check (true);
+create policy "anon_all_goals"         on goals         for all to anon using (true) with check (true);
+create policy "anon_all_exercises"     on exercises     for all to anon using (true) with check (true);
+create policy "anon_all_exercise_logs" on exercise_logs for all to anon using (true) with check (true);
