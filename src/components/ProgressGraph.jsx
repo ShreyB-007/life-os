@@ -24,7 +24,7 @@ function seriesColor(key) { return SERIES_COLORS[key] || '#6366F1' }
 
 function cableValue(set) {
   if (set == null) return null
-  if (set.plates !== undefined) return (set.plates || 0) + (set.mini || 0) * 0.5
+  if (set.plates !== undefined) return (set.plates || 0) * 7 + (set.mini || 0) * 2.3
   return set.weight || 0
 }
 
@@ -63,7 +63,7 @@ function getRepsSeriesValue(sets, key) {
 function getYLabel(wt, viewMode) {
   if (viewMode === 'reps') return 'Reps'
   if (wt === 'barbell' || wt === 'dumbbell') return 'Weight (kg)'
-  if (wt === 'cable') return 'Resistance (plates + mini×0.5)'
+  if (wt === 'cable') return 'Resistance (kg)'
   return 'Duration (seconds)'
 }
 
@@ -196,8 +196,10 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
   const sessions = [...logs].reverse()
   const n = sessions.length
 
-  // Fix 7C: compute cumulative PR session indices (each time a new record was set, oldest→newest)
-  const prIndexes = (() => {
+  // Compute cumulative PR session indices (each time a new record was set, oldest→newest)
+  // latestPRIndex = the most recent session that set a new max (pulsing gold dot)
+  // earlierPRIndexes = all prior PR sessions (static gold diamond)
+  const { latestPRIndex, earlierPRIndexes } = (() => {
     const idxSet = new Set()
     if (wt === 'barbell' || wt === 'dumbbell' || wt === 'cable' || wt === 'reps') {
       let maxSoFar = 0
@@ -206,12 +208,15 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
         if (!sets?.length) continue
         let val
         if (wt === 'barbell' || wt === 'dumbbell') val = Math.max(0, ...sets.map(s => s.weight || 0))
-        else if (wt === 'cable') val = Math.max(0, ...sets.map(s => (s.plates || 0) + (s.mini || 0) * 0.5))
+        else if (wt === 'cable') val = Math.max(0, ...sets.map(s => (s.plates || 0) * 7 + (s.mini || 0) * 2.3))
         else val = Math.max(0, ...sets.map(s => s.reps || 0))
         if (val > maxSoFar) { maxSoFar = val; idxSet.add(i) }
       }
     }
-    return idxSet
+    if (idxSet.size === 0) return { latestPRIndex: -1, earlierPRIndexes: new Set() }
+    const latest = Math.max(...idxSet)
+    const earlier = new Set([...idxSet].filter(j => j !== latest))
+    return { latestPRIndex: latest, earlierPRIndexes: earlier }
   })()
 
   const maxSets = Math.max(0, ...sessions.map(s => s.sets?.length || 0))
@@ -437,24 +442,32 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
                       const isHov = compareMode
                         ? hovered?.sessionIdx === i
                         : hovered?.seriesKey === key && hovered?.sessionIdx === i
-                      // PR dot: gold (#FFD700) distinct from Set 2 amber (#F59E0B)
-                      const isPR = !compareMode && prIndexes.has(i)
+                      // PR dots: gold (#FFD700); latest PR pulses, earlier PRs are static diamonds
+                      const isLatestPR = i === latestPRIndex
+                      const isEarlierPR = earlierPRIndexes.has(i)
+                      const isPR = isLatestPR || isEarlierPR
 
                       return (
                         <g key={i}>
-                          {/* Pulsing ring behind PR dot */}
-                          {isPR && (
+                          {/* Pulsing ring behind latest PR dot only */}
+                          {isLatestPR && (
                             <circle cx={cx} cy={cy} fill="none" stroke="#FFD700" strokeWidth="1.5">
-                              <animate attributeName="r" from="8" to="16" dur="1.5s" repeatCount="indefinite" />
+                              <animate attributeName="r" from="5" to="11" dur="1.5s" repeatCount="indefinite" />
                               <animate attributeName="opacity" from="0.4" to="0" dur="1.5s" repeatCount="indefinite" />
                             </circle>
                           )}
-                          {isPR ? (
+                          {isLatestPR ? (
                             <circle
-                              cx={cx} cy={cy} r={isHov ? 9 : 8}
+                              cx={cx} cy={cy} r={isHov ? 6 : 5}
                               fill="#FFD700"
                               stroke="#FFF8DC" strokeWidth="2" strokeOpacity="0.6"
-                              style={{ filter: 'drop-shadow(0 0 6px rgba(255,215,0,0.8))' }}
+                              style={{ filter: 'drop-shadow(0 0 4px rgba(255,215,0,0.8))' }}
+                            />
+                          ) : isEarlierPR ? (
+                            <polygon
+                              points={`${cx},${cy - 4} ${cx + 4},${cy} ${cx},${cy + 4} ${cx - 4},${cy}`}
+                              fill="#FFD700"
+                              style={{ filter: 'drop-shadow(0 0 3px rgba(255,215,0,0.6))' }}
                             />
                           ) : (
                             <circle cx={cx} cy={cy} r={isHov ? 5 : 3.5} fill={color} />

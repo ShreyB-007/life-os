@@ -9,7 +9,7 @@ import ProgressGraph from './ProgressGraph'
 
 const WORKOUT_EMOJIS = { Push: '💪', Pull: '🏋️', Legs: '🦵', Cardio: '🏃' }
 
-export default function WorkoutDrawer({ workoutType, fromType, onClose, onDone, onDeleteSession }) {
+export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose, onDone, onDeleteSession }) {
   const [exercises, setExercises]             = useState([])
   const [logs, setLogs]                       = useState({})
   const [loading, setLoading]                 = useState(true)
@@ -448,9 +448,14 @@ export default function WorkoutDrawer({ workoutType, fromType, onClose, onDone, 
             )}
             <div className="flex gap-3">
               <button
-                onClick={() => setShowAdd(true)}
+                onClick={() => !viewOnly && setShowAdd(true)}
+                disabled={viewOnly}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-body font-medium text-os-secondary hover:text-os-fg transition-colors"
-                style={{ border: '1px solid var(--drawer-card-border)' }}
+                style={{
+                  border: '1px solid var(--drawer-card-border)',
+                  opacity: viewOnly ? 0.5 : 1,
+                  cursor: viewOnly ? 'not-allowed' : 'pointer',
+                }}
               >
                 <i className="ti ti-plus text-base" />
                 Add exercise

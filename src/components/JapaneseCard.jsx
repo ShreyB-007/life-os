@@ -98,14 +98,8 @@ const JapaneseCard = forwardRef(function JapaneseCard({ streak, todayLog, allLog
                   </span>
                 </label>
                 <div className="flex items-center gap-1 text-xs text-os-muted">
-                  {subStreak > 0 ? (
-                    <>
-                      <i className="ti ti-flame text-xs" style={{ color: '#F59E0B' }} />
-                      <span className="font-mono">{subStreak}</span>
-                    </>
-                  ) : (
-                    <span>—</span>
-                  )}
+                  <i className="ti ti-flame text-xs" style={{ color: '#F59E0B' }} />
+                  <span className="font-mono">{subStreak}</span>
                 </div>
               </div>
             )

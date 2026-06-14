@@ -29,6 +29,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
   const [drawerOpen, setDrawerOpen]              = useState(false)
   const [drawerWorkoutType, setDrawerWorkoutType] = useState(null)
   const [drawerFromType, setDrawerFromType]      = useState(null)
+  const [drawerViewOnly, setDrawerViewOnly]      = useState(false)
   const [historyOpen, setHistoryOpen]            = useState(false)
 
   useEffect(() => {
@@ -71,17 +72,43 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     setSaving(false)
   }
 
-  function selectWorkout(type) {
+  async function selectWorkout(type) {
     if (selected === type) {
       setDrawerWorkoutType(type)
       setDrawerFromType(null)
+      setDrawerViewOnly(false)
       setDrawerOpen(true)
       return
     }
 
-    // Fix 5: derive fromType from todayLog prop directly — avoids any stale state closure
+    // FIX 4: if exercises are already logged for the current selected type today,
+    // open the new type's drawer in view-only mode without changing selected
+    if (selected && !isRest) {
+      const { data: exs } = await supabase
+        .from('exercises')
+        .select('id')
+        .contains('workout_type_tags', [selected])
+      if (exs?.length) {
+        const { data: todayExLogs } = await supabase
+          .from('exercise_logs')
+          .select('id')
+          .in('exercise_id', exs.map(e => e.id))
+          .eq('log_date', todayStr())
+          .limit(1)
+        if (todayExLogs?.length) {
+          setDrawerWorkoutType(type)
+          setDrawerFromType(selected)
+          setDrawerViewOnly(true)
+          setDrawerOpen(true)
+          return
+        }
+      }
+    }
+
+    // Normal path: derive fromType from todayLog prop directly
     const currentType = todayLog?.payload?.workout_type
     const fromType = (isDone && !isRest && currentType && currentType !== 'rest') ? currentType : null
+    setDrawerViewOnly(false)
     doSelect(type, fromType)
   }
 
@@ -102,6 +129,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     save(null, false, false)
     setDrawerOpen(false)
     setDrawerFromType(null)
+    setDrawerViewOnly(false)
   }
 
   // Fix 3: second tap on rest day deselects it
@@ -127,12 +155,14 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
   function openDrawerManually() {
     setDrawerWorkoutType(selected)
     setDrawerFromType(null)
+    setDrawerViewOnly(false)
     setDrawerOpen(true)
   }
 
   function handleDrawerClose() {
     setDrawerOpen(false)
     setDrawerFromType(null)
+    setDrawerViewOnly(false)
   }
 
   return (
@@ -232,6 +262,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
           key={drawerWorkoutType}
           workoutType={drawerWorkoutType}
           fromType={drawerFromType}
+          viewOnly={drawerViewOnly}
           onClose={handleDrawerClose}
           onDone={handleDrawerClose}
           onDeleteSession={handleDeleteSession}

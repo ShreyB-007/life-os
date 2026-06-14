@@ -136,7 +136,7 @@ function formatLastSession(log, wt) {
 // ── PR detection helpers ──────────────────────────────────────────────────────
 function getSingleVal(s, wt) {
   if (wt === 'barbell' || wt === 'dumbbell') return parseFloat(s.weight) || 0
-  if (wt === 'cable') return (parseInt(s.plates) || 0) + (parseInt(s.mini) || 0) * 0.5
+  if (wt === 'cable') return (parseInt(s.plates) || 0) * 7 + (parseInt(s.mini) || 0) * 2.3
   if (wt === 'reps') return parseInt(s.reps) || 0
   return 0
 }
