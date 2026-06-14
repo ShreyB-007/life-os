@@ -23,13 +23,14 @@ export function computeStreak(logs, restDays = []) {
     }
 
     if (log && log.is_rest_day) {
-      // Explicit rest day logged — skip
+      // Explicit rest day logged — skip (counts as satisfied, don't break)
       cursor = prevDay(cursor)
       continue
     }
 
-    if (restDays.includes(dayOfWeek)) {
-      // Scheduled rest day — skip
+    if (restDays.includes(dayOfWeek) && !(log?.done)) {
+      // Scheduled rest day with no log — skip without penalising
+      // If a log exists with done=true on a rest day, fall through and count it
       cursor = prevDay(cursor)
       continue
     }

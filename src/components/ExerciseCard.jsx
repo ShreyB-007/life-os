@@ -198,6 +198,11 @@ export default function ExerciseCard({
   const logBtnRef       = useRef(null)
   const weightRefs      = useRef({})  // idx → input DOM element
   const comparisonTimer = useRef(null)
+  const prDebounceRef   = useRef(null)
+
+  // Cached prior-session max, computed once when card expands (never re-fetches on keystrokes)
+  const [priorMax, setPriorMax]             = useState(null)
+  const [priorSessionCount, setPriorSessionCount] = useState(0)
 
   useEffect(() => {
     setSets(setsFromLog(todayLog, wt))
@@ -217,6 +222,32 @@ export default function ExerciseCard({
     document.addEventListener('mousedown', onOutside)
     return () => document.removeEventListener('mousedown', onOutside)
   }, [showTagPicker])
+
+  // Compute priorMax once when card expands — avoid repeated DB calls on keystrokes
+  useEffect(() => {
+    if (!expanded) return
+    const priorLogs = logs.filter(l => l.log_date !== today)
+    setPriorSessionCount(priorLogs.length)
+    if (priorLogs.length === 0) {
+      setPriorMax(0)
+    } else {
+      const m = priorLogs.reduce((acc, l) => Math.max(acc, getMaxFromLog(l, wt)), 0)
+      setPriorMax(m)
+    }
+  }, [expanded])
+
+  // Live PR detection — debounced 300ms, runs on every input change
+  useEffect(() => {
+    if (!expanded || priorMax === null) return
+    if (wt !== 'barbell' && wt !== 'dumbbell' && wt !== 'cable' && wt !== 'reps') return
+    clearTimeout(prDebounceRef.current)
+    prDebounceRef.current = setTimeout(() => {
+      const currentMax = Math.max(0, ...sets.map(s => getSingleVal(s, wt)))
+      const isPRLive = priorSessionCount === 0 || currentMax > priorMax
+      setPrBadge(isPRLive)
+    }, 300)
+    return () => clearTimeout(prDebounceRef.current)
+  }, [sets, priorMax, priorSessionCount, expanded])
 
   // ── Days-since + streak ───────────────────────────────────────────────────
   const days = daysSince(mostRecent?.log_date ?? null)
@@ -403,10 +434,10 @@ export default function ExerciseCard({
     await supabase.from('exercise_logs').upsert(entry, { onConflict: 'exercise_id,log_date' })
     setSaving(false)
 
-    const isPR = checkPR(payload)
+    // prBadge is already the live-computed value from the debounced effect
+    const isPR = prBadge
     spawnParticles(logBtnRef.current, isPR)
     if (isPR) {
-      setPrBadge(true)
       setPrFlash(true)
       setTimeout(() => setPrFlash(false), 1600)
     }

@@ -83,7 +83,7 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, onLog }, ref) {
             <i className="ti ti-code text-lg" style={{ color: '#06B6D4' }} />
             <span className="font-display font-semibold text-sm text-os-fg">DSA</span>
           </div>
-          <StreakDisplay count={isDone ? streak : 0} flash={booped} />
+          <StreakDisplay count={streak} flash={booped} />
         </div>
 
         <div className="flex flex-col gap-3 mb-4">

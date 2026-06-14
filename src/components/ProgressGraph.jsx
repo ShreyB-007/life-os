@@ -67,17 +67,12 @@ function getYLabel(wt, viewMode) {
   return 'Duration (seconds)'
 }
 
-// Fix 5: compute proper tick values
+// Always starts y-axis from 0; adds 15% headroom above max
 function computeTicks(allVals, use2p5) {
-  if (allVals.length === 0) return { ticks: [0, 5, 10], yMin: 0, yMax: 10 }
-
-  const rawMin = Math.min(...allVals)
-  const rawMax = Math.max(...allVals)
+  const rawMax = allVals.length > 0 ? Math.max(...allVals) : 10
 
   if (use2p5) {
-    let yMin = Math.floor(rawMin / 2.5) * 2.5
-    let yMax = Math.ceil(rawMax / 2.5) * 2.5
-    if (yMin === yMax) { yMin -= 5; yMax += 5 }
+    const yMax = Math.max(2.5, Math.ceil(rawMax * 1.15 / 2.5) * 2.5)
 
     function genTicks(min, max, step) {
       const ticks = []
@@ -86,14 +81,12 @@ function computeTicks(allVals, use2p5) {
       return ticks
     }
 
-    let ticks = genTicks(yMin, yMax, 2.5)
-    if (ticks.length > 8) ticks = genTicks(yMin, yMax, 5)
-    if (ticks.length > 8) ticks = genTicks(yMin, yMax, 10)
-    return { ticks, yMin, yMax }
+    let ticks = genTicks(0, yMax, 2.5)
+    if (ticks.length > 8) ticks = genTicks(0, yMax, 5)
+    if (ticks.length > 8) ticks = genTicks(0, yMax, 10)
+    return { ticks, yMin: 0, yMax }
   } else {
-    let yMin = Math.max(0, Math.floor(rawMin))
-    let yMax = Math.ceil(rawMax)
-    if (yMin === yMax) { yMin = Math.max(0, yMin - 5); yMax = yMax + 5 }
+    const yMax = Math.max(1, Math.ceil(rawMax * 1.15))
 
     function genTicks(min, max, step) {
       const ticks = []
@@ -101,11 +94,11 @@ function computeTicks(allVals, use2p5) {
       return ticks
     }
 
-    let ticks = genTicks(yMin, yMax, 1)
-    if (ticks.length > 8) ticks = genTicks(yMin, yMax, 2)
-    if (ticks.length > 8) ticks = genTicks(yMin, yMax, 5)
-    if (ticks.length > 8) ticks = genTicks(yMin, yMax, 10)
-    return { ticks, yMin, yMax }
+    let ticks = genTicks(0, yMax, 1)
+    if (ticks.length > 8) ticks = genTicks(0, yMax, 2)
+    if (ticks.length > 8) ticks = genTicks(0, yMax, 5)
+    if (ticks.length > 8) ticks = genTicks(0, yMax, 10)
+    return { ticks, yMin: 0, yMax }
   }
 }
 
@@ -299,8 +292,8 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
     <>
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" style={{ zIndex: 200 }} onClick={onClose} />
       <div
-        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl p-5 w-full max-w-lg mx-4"
-        style={{ zIndex: 201, background: 'var(--drawer-bg)', border: '1px solid var(--drawer-card-border)', maxHeight: '90vh', overflowY: 'auto' }}
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl p-5 w-[90vw] max-w-[900px]"
+        style={{ zIndex: 201, background: 'var(--drawer-bg)', border: '1px solid var(--drawer-card-border)', height: '85vh', overflowY: 'auto' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Title row */}
@@ -397,7 +390,7 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
           </div>
         ) : (
           <>
-            <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 200, overflow: 'visible' }}>
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 'max(220px, 55vh)', overflow: 'visible' }}>
               {/* Fix 5: grid lines + Y labels with proper ticks */}
               {gridVals.map((val, ti) => {
                 const y = py(val)
@@ -444,17 +437,28 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
                       const isHov = compareMode
                         ? hovered?.sessionIdx === i
                         : hovered?.seriesKey === key && hovered?.sessionIdx === i
-                      // Fix 7C: gold star for cumulative PR sessions (single-series only)
+                      // PR dot: gold (#FFD700) distinct from Set 2 amber (#F59E0B)
                       const isPR = !compareMode && prIndexes.has(i)
 
                       return (
                         <g key={i}>
+                          {/* Pulsing ring behind PR dot */}
+                          {isPR && (
+                            <circle cx={cx} cy={cy} fill="none" stroke="#FFD700" strokeWidth="1.5">
+                              <animate attributeName="r" from="8" to="16" dur="1.5s" repeatCount="indefinite" />
+                              <animate attributeName="opacity" from="0.4" to="0" dur="1.5s" repeatCount="indefinite" />
+                            </circle>
+                          )}
                           {isPR ? (
-                            <circle cx={cx} cy={cy} r={isHov ? 6 : 4.5} fill="#F59E0B" />
+                            <circle
+                              cx={cx} cy={cy} r={isHov ? 9 : 8}
+                              fill="#FFD700"
+                              stroke="#FFF8DC" strokeWidth="2" strokeOpacity="0.6"
+                              style={{ filter: 'drop-shadow(0 0 6px rgba(255,215,0,0.8))' }}
+                            />
                           ) : (
                             <circle cx={cx} cy={cy} r={isHov ? 5 : 3.5} fill={color} />
                           )}
-                          {isPR && <circle cx={cx} cy={cy} r={isHov ? 10 : 7} fill="#F59E0B" fillOpacity="0.15" />}
                           {!isPR && isHov && <circle cx={cx} cy={cy} r="9" fill={color} fillOpacity="0.18" />}
 
                           {/* Individual tooltip for single-series mode */}
@@ -465,7 +469,7 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
                               <g>
                                 <rect x={tipX - 60} y={tipY} width="120" height="22" rx="4" fill="#0F0F1A" stroke="#1C1C2E" />
                                 <text x={tipX} y={tipY + 14} textAnchor="middle" fontSize="10" fill="#E8E8F0" className="font-mono">
-                                  {session.log_date.slice(5)} · {formatTooltipValue(val, key, session, wt)}
+                                  {session.log_date.slice(5)} · {isPR ? '🏆 ' : ''}{formatTooltipValue(val, key, session, wt)}
                                 </text>
                               </g>
                             )
