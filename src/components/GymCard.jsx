@@ -165,6 +165,22 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     setDrawerViewOnly(false)
   }
 
+  function handleTransferComplete(targetType) {
+    // Reset drawer state — target is now the active session, no longer view-only
+    setDrawerViewOnly(false)
+    setDrawerFromType(null)
+    setDrawerWorkoutType(targetType)
+    // Propagate to Dashboard so todayLogs updates and GymCard's selected re-syncs via useEffect
+    onLog('gym', {
+      habit_key: 'gym',
+      log_date: todayStr(),
+      done: true,
+      is_rest_day: false,
+      payload: { workout_type: targetType },
+      logged_at: new Date().toISOString(),
+    })
+  }
+
   return (
     <>
       <div
@@ -266,6 +282,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
           onClose={handleDrawerClose}
           onDone={handleDrawerClose}
           onDeleteSession={handleDeleteSession}
+          onTransferComplete={handleTransferComplete}
         />
       )}
 

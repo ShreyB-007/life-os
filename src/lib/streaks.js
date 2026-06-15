@@ -16,8 +16,8 @@ export function computeStreak(logs, restDays = []) {
     const dayOfWeek = cursor.getDay()
     const log = logMap[dateStr]
 
-    if (dateStr === today && !log) {
-      // Today with no log yet — skip, don't penalise
+    if (dateStr === today && (!log || (!log.done && !log.is_rest_day))) {
+      // Today with no log, or still in-progress — skip, don't penalise
       cursor = prevDay(cursor)
       continue
     }
@@ -112,7 +112,8 @@ export function computeSubtaskStreak(allLogs, subtaskKey) {
     const dateStr = toDateStr(cursor)
     const log = allLogs.find(l => l.log_date === dateStr)
 
-    if (dateStr === today && !log) {
+    if (dateStr === today && !log?.payload?.subtasks?.[subtaskKey]) {
+      // Today with no log, or subtask not yet done — skip, don't penalise
       cursor = prevDay(cursor)
       continue
     }

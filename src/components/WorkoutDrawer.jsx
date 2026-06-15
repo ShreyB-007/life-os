@@ -9,7 +9,7 @@ import ProgressGraph from './ProgressGraph'
 
 const WORKOUT_EMOJIS = { Push: '💪', Pull: '🏋️', Legs: '🦵', Cardio: '🏃' }
 
-export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose, onDone, onDeleteSession }) {
+export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose, onDone, onDeleteSession, onTransferComplete }) {
   const [exercises, setExercises]             = useState([])
   const [logs, setLogs]                       = useState({})
   const [loading, setLoading]                 = useState(true)
@@ -86,69 +86,116 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
     setTransferring(true)
     const today = todayStr()
 
-    const { data: fromExs } = await supabase
-      .from('exercises')
-      .select('id, normalized_name, workout_type_tags, primary_workout_type')
-      .contains('workout_type_tags', [fromType])
+    try {
+      // Fetch source exercises and today's logs with full data
+      const { data: fromExs } = await supabase
+        .from('exercises')
+        .select('id, normalized_name, workout_type_tags, primary_workout_type, weight_type')
+        .contains('workout_type_tags', [fromType])
 
-    if (!fromExs?.length) { setTransferring(false); setShowTransferBanner(false); return }
+      if (!fromExs?.length) { setShowTransferBanner(false); return }
 
-    const { data: fromLogs } = await supabase
-      .from('exercise_logs')
-      .select('id, exercise_id')
-      .in('exercise_id', fromExs.map(e => e.id))
-      .eq('log_date', today)
+      const { data: fromLogs } = await supabase
+        .from('exercise_logs')
+        .select('*')
+        .in('exercise_id', fromExs.map(e => e.id))
+        .eq('log_date', today)
 
-    if (!fromLogs?.length) { setTransferring(false); setShowTransferBanner(false); return }
+      if (!fromLogs?.length) { setShowTransferBanner(false); return }
 
-    for (const log of fromLogs) {
-      const exercise = fromExs.find(e => e.id === log.exercise_id)
-      if (!exercise) continue
+      // Step 1: For each source log, find/create the target exercise and copy the log there
+      // if it maps to a different exercise. Track which source logs were moved.
+      const movedLogIds = []
 
-      const tags = exercise.workout_type_tags || []
+      for (const log of fromLogs) {
+        const srcEx = fromExs.find(e => e.id === log.exercise_id)
+        if (!srcEx) continue
 
-      if (!tags.includes(workoutType)) {
+        const srcTags = srcEx.workout_type_tags || []
+
+        if (srcTags.includes(workoutType)) {
+          // Exercise already has the target tag — log stays on this exercise.
+          // Source tag cleanup (step 3) will remove the source tag if no prior history.
+          continue
+        }
+
+        // Find a matching exercise already in the target type
         const { data: match } = await supabase
-          .from('exercises')
-          .select('id')
-          .eq('normalized_name', exercise.normalized_name)
+          .from('exercises').select('id')
+          .eq('normalized_name', srcEx.normalized_name)
           .contains('workout_type_tags', [workoutType])
           .maybeSingle()
 
         if (match) {
-          await supabase.from('exercise_logs').update({ exercise_id: match.id }).eq('id', log.id)
+          // Copy log to the existing target exercise
+          const { error: upsertErr } = await supabase.from('exercise_logs').upsert({
+            exercise_id: match.id,
+            log_date: log.log_date,
+            sets: log.sets,
+            logged_at: log.logged_at,
+          }, { onConflict: 'exercise_id,log_date' })
+          if (upsertErr) throw upsertErr
+          movedLogIds.push(log.id)
         } else {
+          // No matching target exercise — add target tag to this exercise.
+          // Source tag cleanup (step 3) will remove the source tag if no prior history.
           await supabase.from('exercises')
-            .update({ workout_type_tags: [...tags, workoutType] })
-            .eq('id', exercise.id)
+            .update({ workout_type_tags: [...srcTags, workoutType] })
+            .eq('id', srcEx.id)
         }
       }
 
-      // Clean up source type if exercise has no prior history there
-      const { data: priorLogs } = await supabase
-        .from('exercise_logs')
-        .select('id')
-        .eq('exercise_id', exercise.id)
-        .lt('log_date', today)
-        .limit(1)
+      // Step 2: Delete source logs that were copied to a different exercise
+      if (movedLogIds.length > 0) {
+        const { error: deleteErr } = await supabase
+          .from('exercise_logs').delete().in('id', movedLogIds)
+        if (deleteErr) throw deleteErr
+      }
 
-      if (!priorLogs?.length) {
-        const cleanedTags = tags.filter(t => t !== fromType)
-        if (cleanedTags.length === 0) {
-          await supabase.from('exercises').update({
-            workout_type_tags: [workoutType],
-            primary_workout_type: workoutType,
-          }).eq('id', exercise.id)
-        } else {
-          await supabase.from('exercises').update({ workout_type_tags: cleanedTags }).eq('id', exercise.id)
+      // Step 3: Remove source type tag from exercises that have no prior history there
+      for (const srcEx of fromExs) {
+        const srcTags = srcEx.workout_type_tags || []
+        if (!srcTags.includes(fromType)) continue
+
+        const { data: priorLogs } = await supabase
+          .from('exercise_logs').select('id')
+          .eq('exercise_id', srcEx.id)
+          .lt('log_date', today)
+          .limit(1)
+
+        if (!priorLogs?.length) {
+          const cleanedTags = srcTags.filter(t => t !== fromType)
+          if (cleanedTags.length === 0) {
+            await supabase.from('exercises').update({
+              workout_type_tags: [workoutType],
+              primary_workout_type: workoutType,
+            }).eq('id', srcEx.id)
+          } else {
+            await supabase.from('exercises').update({ workout_type_tags: cleanedTags }).eq('id', srcEx.id)
+          }
         }
       }
+
+      // Step 4: Update habit_log to reflect the new active workout type
+      await supabase.from('habit_logs').upsert({
+        habit_key: 'gym',
+        log_date: today,
+        done: true,
+        is_rest_day: false,
+        payload: { workout_type: workoutType },
+        logged_at: new Date().toISOString(),
+      }, { onConflict: 'habit_key,log_date' })
+
+      setShowTransferBanner(false)
+      await fetchData()
+      showToast(`Session transferred from ${fromType}`)
+      onTransferComplete?.(workoutType)
+
+    } catch {
+      showToast('Transfer failed — please try again')
+    } finally {
+      setTransferring(false)
     }
-
-    setShowTransferBanner(false)
-    setTransferring(false)
-    await fetchData()
-    showToast(`Session transferred from ${fromType}`)
   }
 
   function handleLogSave(exerciseId, entry) {

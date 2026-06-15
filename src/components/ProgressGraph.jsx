@@ -467,9 +467,9 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
 
                       return (
                         <g key={i}>
-                          {/* Pulsing ring behind latest PR dot only */}
+                          {/* Pulsing ring — pointerEvents="none" so it doesn't block the hit target */}
                           {isLatestPR && (
-                            <circle cx={cx} cy={cy} fill="none" stroke="#FFD700" strokeWidth="1.5">
+                            <circle cx={cx} cy={cy} fill="none" stroke="#FFD700" strokeWidth="1.5" pointerEvents="none">
                               <animate attributeName="r" from="5" to="11" dur="1.5s" repeatCount="indefinite" />
                               <animate attributeName="opacity" from="0.4" to="0" dur="1.5s" repeatCount="indefinite" />
                             </circle>
@@ -479,25 +479,27 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
                               cx={cx} cy={cy} r={isHov ? 6 : 5}
                               fill="#FFD700"
                               stroke="#FFF8DC" strokeWidth="2" strokeOpacity="0.6"
+                              pointerEvents="none"
                               style={{ filter: 'drop-shadow(0 0 4px rgba(255,215,0,0.8))' }}
                             />
                           ) : isEarlierPR ? (
                             <polygon
                               points={`${cx},${cy - 4} ${cx + 4},${cy} ${cx},${cy + 4} ${cx - 4},${cy}`}
                               fill="#FFD700"
+                              pointerEvents="none"
                               style={{ filter: 'drop-shadow(0 0 3px rgba(255,215,0,0.6))' }}
                             />
                           ) : (
-                            <circle cx={cx} cy={cy} r={isHov ? 5 : 3.5} fill={color} />
+                            <circle cx={cx} cy={cy} r={isHov ? 5 : 3.5} fill={color} pointerEvents="none" />
                           )}
-                          {!isPR && isHov && <circle cx={cx} cy={cy} r="9" fill={color} fillOpacity="0.18" />}
+                          {!isPR && isHov && <circle cx={cx} cy={cy} r="9" fill={color} fillOpacity="0.18" pointerEvents="none" />}
 
                           {/* Individual tooltip for single-series mode */}
                           {!compareMode && isHov && (() => {
                             const tipX = Math.min(Math.max(cx, PAD.left + 60), W - PAD.right - 60)
                             const tipY = cy - 36
                             return (
-                              <g>
+                              <g pointerEvents="none">
                                 <rect x={tipX - 60} y={tipY} width="120" height="22" rx="4" fill="#0F0F1A" stroke="#1C1C2E" />
                                 <text x={tipX} y={tipY + 14} textAnchor="middle" fontSize="10" fill="#E8E8F0" className="font-mono">
                                   {session.log_date.slice(5)} · {isPR ? '🏆 ' : ''}{formatTooltipValue(val, key, session, wt)}
@@ -506,8 +508,9 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
                             )
                           })()}
 
+                          {/* Hit target — uses cy (with compare-mode offset) so it aligns with the dot */}
                           <circle
-                            cx={cx} cy={py(val)} r="14" fill="transparent"
+                            cx={cx} cy={cy} r="14" fill="transparent"
                             style={{ cursor: 'crosshair' }}
                             onMouseEnter={() => setHovered({ seriesKey: key, sessionIdx: i })}
                             onMouseLeave={() => setHovered(null)}
