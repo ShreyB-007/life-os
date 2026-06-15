@@ -10,3 +10,6 @@ dist
 .agents/
 .claude/
 skills-lock.json
+
+# QA reports (local only)
+qa_reports/

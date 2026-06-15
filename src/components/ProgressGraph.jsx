@@ -1,10 +1,3 @@
-/*
- * Fixes applied:
- * - Fix 4: Weight / Reps view toggle for barbell/dumbbell/cable exercises
- * - Fix 5: Y axis domain + ticks at 2.5kg intervals (or 1/2/5 for reps); correct decimal formatter
- * - Fix 6: Overlapping dot offset in compare mode; combined per-date tooltip
- * - Fix 7C: Gold star markers at cumulative PR sessions (single-series mode only)
- */
 import { useState } from 'react'
 
 const W = 480, H = 220
@@ -196,30 +189,54 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
   const sessions = [...logs].reverse()
   const n = sessions.length
 
-  // Compute cumulative PR session indices (each time a new record was set, oldest→newest)
-  // latestPRIndex = the most recent session that set a new max (pulsing gold dot)
-  // earlierPRIndexes = all prior PR sessions (static gold diamond)
-  const { latestPRIndex, earlierPRIndexes } = (() => {
-    const idxSet = new Set()
-    if (wt === 'barbell' || wt === 'dumbbell' || wt === 'cable' || wt === 'reps') {
-      let maxSoFar = 0
-      for (let i = 0; i < n; i++) {
-        const sets = sessions[i]?.sets
-        if (!sets?.length) continue
-        let val
-        if (wt === 'barbell' || wt === 'dumbbell') val = Math.max(0, ...sets.map(s => s.weight || 0))
-        else if (wt === 'cable') val = Math.max(0, ...sets.map(s => (s.plates || 0) * 7 + (s.mini || 0) * 2.3))
-        else val = Math.max(0, ...sets.map(s => s.reps || 0))
-        if (val > maxSoFar) { maxSoFar = val; idxSet.add(i) }
-      }
-    }
-    if (idxSet.size === 0) return { latestPRIndex: -1, earlierPRIndexes: new Set() }
-    const latest = Math.max(...idxSet)
-    const earlier = new Set([...idxSet].filter(j => j !== latest))
-    return { latestPRIndex: latest, earlierPRIndexes: earlier }
-  })()
-
   const maxSets = Math.max(0, ...sessions.map(s => s.sets?.length || 0))
+
+  // Per-series PR computation: prStyle[seriesKey][sessionIdx] = 'latest' | 'earlier'
+  // 'max' key: PR = new high across all sets that session
+  // 'set0', 'set1', ...: each position tracks its own running max independently
+  const prStyle = (() => {
+    const result = {}
+    if (wt !== 'barbell' && wt !== 'dumbbell' && wt !== 'cable' && wt !== 'reps') return result
+
+    function buildPRMap(getVal) {
+      let runMax = -Infinity
+      const prSet = new Set()
+      for (let i = 0; i < n; i++) {
+        const val = getVal(i)
+        if (val == null || val <= 0) continue
+        if (val > runMax) { runMax = val; prSet.add(i) }
+      }
+      if (prSet.size === 0) return {}
+      const latest = Math.max(...prSet)
+      const map = {}
+      prSet.forEach(i => { map[i] = i === latest ? 'latest' : 'earlier' })
+      return map
+    }
+
+    result['max'] = buildPRMap(i => {
+      const sets = sessions[i]?.sets
+      if (!sets?.length) return null
+      const vals = sets.map(s => {
+        if (wt === 'barbell' || wt === 'dumbbell') return s.weight || 0
+        if (wt === 'cable') return (s.plates || 0) * 7 + (s.mini || 0) * 2.3
+        return s.reps || 0
+      })
+      return Math.max(...vals)
+    })
+
+    for (let pos = 0; pos < maxSets; pos++) {
+      result[`set${pos}`] = buildPRMap(i => {
+        const sets = sessions[i]?.sets
+        if (!sets || pos >= sets.length) return null
+        const s = sets[pos]
+        if (wt === 'barbell' || wt === 'dumbbell') return s.weight || 0
+        if (wt === 'cable') return (s.plates || 0) * 7 + (s.mini || 0) * 2.3
+        return s.reps || 0
+      })
+    }
+
+    return result
+  })()
   const seriesOptions = [
     { key: 'max', label: viewMode === 'reps' ? 'Max reps' : 'Max' },
     ...Array.from({ length: maxSets }, (_, i) => ({ key: `set${i}`, label: `Set ${i + 1}` })),
@@ -442,9 +459,10 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
                       const isHov = compareMode
                         ? hovered?.sessionIdx === i
                         : hovered?.seriesKey === key && hovered?.sessionIdx === i
-                      // PR dots: gold (#FFD700); latest PR pulses, earlier PRs are static diamonds
-                      const isLatestPR = i === latestPRIndex
-                      const isEarlierPR = earlierPRIndexes.has(i)
+                      // PR dots per series — each set position tracks its own PR history independently
+                      const dotStyle = prStyle[key]?.[i] || 'normal'
+                      const isLatestPR = dotStyle === 'latest'
+                      const isEarlierPR = dotStyle === 'earlier'
                       const isPR = isLatestPR || isEarlierPR
 
                       return (
