@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview --port 4173",
+    "qa": "playwright test -c qa/playwright.config.mjs"
   },
   "keywords": [],
   "author": "",
@@ -19,6 +20,7 @@
     "react-router-dom": "^6.30.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.0",
     "@vitejs/plugin-react": "^6.0.2",
     "autoprefixer": "^10.5.0",
     "postcss": "^8.5.15",

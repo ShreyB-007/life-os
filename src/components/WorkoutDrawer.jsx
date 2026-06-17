@@ -21,11 +21,24 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
   const [showTransferBanner, setShowTransferBanner] = useState(false)
   const [transferring, setTransferring]       = useState(false)
   const [deletingSession, setDeletingSession] = useState(false)
-  const [cursor, setCursor]                   = useState({ x: 200, y: 200 })
 
   const drawerRef = useRef(null)
 
   useEffect(() => { fetchData() }, [workoutType])
+
+  // Cursor glow — direct DOM manipulation, bypassing React state, so tracking
+  // runs at native mouse speed instead of re-rendering on every mousemove.
+  useEffect(() => {
+    const el = drawerRef.current
+    if (!el) return
+    function handleDrawerMove(e) {
+      const rect = el.getBoundingClientRect()
+      el.style.setProperty('--drawer-cursor-x', `${e.clientX - rect.left - 200}px`)
+      el.style.setProperty('--drawer-cursor-y', `${e.clientY - rect.top - 200}px`)
+    }
+    el.addEventListener('mousemove', handleDrawerMove, { passive: true })
+    return () => el.removeEventListener('mousemove', handleDrawerMove)
+  }, [])
 
   useEffect(() => {
     if (fromType) checkForTransfer()
@@ -341,12 +354,6 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
     setTimeout(() => setToast(null), 3000)
   }
 
-  function handleMouseMove(e) {
-    const rect = drawerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    setCursor({ x: e.clientX - rect.left, y: e.clientY - rect.top })
-  }
-
   const today = todayStr()
   const hasTodaySession = exercises.some(ex => (logs[ex.id] || []).some(l => l.log_date === today))
 
@@ -373,9 +380,8 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
           position: 'fixed',
         }}
         onClick={e => e.stopPropagation()}
-        onMouseMove={handleMouseMove}
       >
-        {/* Atmospheric cursor glow */}
+        {/* Atmospheric cursor glow — position driven by CSS vars set via direct DOM writes */}
         <div
           style={{
             position: 'absolute',
@@ -383,10 +389,9 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
             width: 400, height: 400,
             borderRadius: '50%',
             background: 'radial-gradient(circle, var(--drawer-cursor-glow) 0%, transparent 70%)',
-            left: cursor.x - 200,
-            top: cursor.y - 200,
+            left: 'var(--drawer-cursor-x, 0px)',
+            top: 'var(--drawer-cursor-y, 0px)',
             zIndex: 0,
-            transition: 'left 60ms ease, top 60ms ease',
           }}
         />
         {/* Atmospheric blob 1 */}
@@ -497,14 +502,9 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
               <button
                 onClick={() => !viewOnly && setShowAdd(true)}
                 disabled={viewOnly}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-body font-medium text-os-secondary hover:text-os-fg transition-colors"
-                style={{
-                  border: '1px solid var(--drawer-card-border)',
-                  opacity: viewOnly ? 0.5 : 1,
-                  cursor: viewOnly ? 'not-allowed' : 'pointer',
-                }}
+                className="action-pill-btn action-pill-indigo"
               >
-                <i className="ti ti-plus text-base" />
+                <i className="ti ti-plus" />
                 Add exercise
               </button>
               <button

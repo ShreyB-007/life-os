@@ -134,21 +134,29 @@ function formatLastSession(log, wt) {
 }
 
 // ── PR detection helpers ──────────────────────────────────────────────────────
+// Live form value (sets currently being typed — time uses mins/secs strings)
 function getSingleVal(s, wt) {
   if (wt === 'barbell' || wt === 'dumbbell') return parseFloat(s.weight) || 0
   if (wt === 'cable') return (parseInt(s.plates) || 0) * 7 + (parseInt(s.mini) || 0) * 2.3
   if (wt === 'reps') return parseInt(s.reps) || 0
+  if (wt === 'time') return (parseInt(s.mins) || 0) * 60 + (parseInt(s.secs) || 0)
   return 0
+}
+
+// Saved/payload value (DB format — time uses a single duration field)
+function getSavedVal(s, wt) {
+  if (wt === 'time') return s.duration || 0
+  return getSingleVal(s, wt)
 }
 
 function getMaxFromLog(log, wt) {
   if (!log?.sets?.length) return 0
-  return Math.max(0, ...log.sets.map(s => getSingleVal(s, wt)))
+  return Math.max(0, ...log.sets.map(s => getSavedVal(s, wt)))
 }
 
 function getMaxFromSets(sets, wt) {
   if (!sets?.length) return 0
-  return Math.max(0, ...sets.map(s => getSingleVal(s, wt)))
+  return Math.max(0, ...sets.map(s => getSavedVal(s, wt)))
 }
 
 // ── Days-since urgency ────────────────────────────────────────────────────────
@@ -212,6 +220,14 @@ export default function ExerciseCard({
     setComparisonActive(false)
   }, [todayLog?.log_date])
 
+  // Collapsing without saving should drop the live-preview PR badge — otherwise an
+  // abandoned edit that briefly looked like a PR keeps showing in the collapsed header.
+  const wasExpanded = useRef(expanded)
+  useEffect(() => {
+    if (wasExpanded.current && !expanded && !saved) setPrBadge(false)
+    wasExpanded.current = expanded
+  }, [expanded, saved])
+
   useEffect(() => {
     if (!showTagPicker) return
     function onOutside(e) {
@@ -239,7 +255,6 @@ export default function ExerciseCard({
   // Live PR detection — debounced 300ms, runs on every input change
   useEffect(() => {
     if (!expanded || priorMax === null) return
-    if (wt !== 'barbell' && wt !== 'dumbbell' && wt !== 'cable' && wt !== 'reps') return
     clearTimeout(prDebounceRef.current)
     prDebounceRef.current = setTimeout(() => {
       const currentMax = Math.max(0, ...sets.map(s => getSingleVal(s, wt)))
@@ -409,7 +424,6 @@ export default function ExerciseCard({
   }
 
   function checkPR(payload) {
-    if (wt !== 'barbell' && wt !== 'dumbbell' && wt !== 'cable' && wt !== 'reps') return false
     const priorLogs = logs.filter(l => l.log_date !== today)
     // Fix 7A: first-ever log for this exercise is always a PR
     if (!priorLogs.length) return true
@@ -428,14 +442,18 @@ export default function ExerciseCard({
       sets: payload,
       logged_at: new Date().toISOString(),
     }
+    // Compute the PR verdict synchronously against the payload actually being saved —
+    // don't trust prBadge, which is debounced 300ms and can be stale if the user
+    // edits a value and hits Log before the debounce fires.
+    const isPR = checkPR(payload)
+    setPrBadge(isPR)
+
     onLogSave({ ...entry, id: todayLog?.id ?? `opt-${Date.now()}` })
     setSaving(true)
     setSaved(true)
     await supabase.from('exercise_logs').upsert(entry, { onConflict: 'exercise_id,log_date' })
     setSaving(false)
 
-    // prBadge is already the live-computed value from the debounced effect
-    const isPR = prBadge
     spawnParticles(logBtnRef.current, isPR)
     if (isPR) {
       setPrFlash(true)
@@ -505,14 +523,20 @@ export default function ExerciseCard({
               <i className="ti ti-tag-plus text-sm" />
             </button>
           )}
-          <button onClick={e => { e.stopPropagation(); onOpenGraph() }} className="p-2 rounded-md text-os-muted hover:text-os-indigo transition-colors" title="View progress">
-            <i className="ti ti-chart-line text-sm" />
-          </button>
-          <button onClick={e => { e.stopPropagation(); onDelete() }} className="p-2 rounded-md text-os-muted hover:text-red-500 transition-colors" title="Delete exercise">
-            <i className="ti ti-trash text-sm" />
-          </button>
           <i className={['ti text-sm text-os-muted transition-transform duration-200 mr-0.5', expanded ? 'ti-chevron-up' : 'ti-chevron-down'].join(' ')} />
         </div>
+      </div>
+
+      {/* Action row */}
+      <div className="flex flex-wrap gap-2 px-4 pb-3">
+        <button onClick={() => onOpenGraph()} className="action-pill-btn action-pill-emerald">
+          <i className="ti ti-chart-line" />
+          View graph
+        </button>
+        <button onClick={() => onDelete()} className="action-pill-btn action-pill-red">
+          <i className="ti ti-trash" />
+          Delete
+        </button>
       </div>
 
       {/* Expanded form */}

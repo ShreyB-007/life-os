@@ -1,0 +1,159 @@
+{
+  "version": "1.0",
+  "generated": "2026-06-15",
+  "description": "Behavioral checklist derived from the Life OS feature set. Each check maps to a Playwright test.",
+  "areas": {
+    "theme": {
+      "label": "Theme & Dark Mode",
+      "checks": [
+        { "id": "theme-01", "label": "Page loads in dark mode by default (html.dark class present)" },
+        { "id": "theme-02", "label": "Theme toggle button exists in navbar" },
+        { "id": "theme-03", "label": "Clicking toggle switches html.dark on/off" },
+        { "id": "theme-04", "label": "Theme choice persists in localStorage across reload" },
+        { "id": "theme-05", "label": "No flash of wrong theme on page load" }
+      ]
+    },
+    "navigation": {
+      "label": "Navigation",
+      "checks": [
+        { "id": "nav-01", "label": "Navbar has 5 links: Dashboard, Goals, Masters, Digest, Review" },
+        { "id": "nav-02", "label": "Active link shows an accent indicator" },
+        { "id": "nav-03", "label": "Route changes are SPA (no full page reload)" },
+        { "id": "nav-04", "label": "Navbar has blur backdrop style" }
+      ]
+    },
+    "topbar": {
+      "label": "Top Bar",
+      "checks": [
+        { "id": "top-01", "label": "Time-appropriate greeting shown (Good morning / afternoon / evening)" },
+        { "id": "top-02", "label": "Today's date shown in human-readable format" },
+        { "id": "top-03", "label": "Overall streak number visible (numeric, even if 0)" },
+        { "id": "top-04", "label": "Flame icon present next to streak number" },
+        { "id": "top-05", "label": "Next milestone line shows when streak > 0" }
+      ]
+    },
+    "gym_card": {
+      "label": "Gym Card",
+      "checks": [
+        { "id": "gym-01", "label": "Card renders with 'Gym' title and barbell icon" },
+        { "id": "gym-02", "label": "Streak display (flame + number) visible on card" },
+        { "id": "gym-03", "label": "4 workout buttons: Push, Pull, Legs, Cardio" },
+        { "id": "gym-04", "label": "Rest day button visible and labeled" },
+        { "id": "gym-05", "label": "History button visible" },
+        { "id": "gym-06", "label": "Status text reflects initial state ('Select workout')" },
+        { "id": "gym-07", "label": "Accent bar is indigo by default (not done state)" },
+        { "id": "gym-08", "label": "Clicking a workout type selects it (shows as active)" },
+        { "id": "gym-09", "label": "Clicking same workout type again opens the WorkoutDrawer" },
+        { "id": "gym-10", "label": "Clicking Rest day toggles isRest state" },
+        { "id": "gym-11", "label": "Rest day button shows usage count when 1 rest day used" },
+        { "id": "gym-12", "label": "Rest day button is disabled at 2 uses (shows 'Rest limit reached')" }
+      ]
+    },
+    "japanese_card": {
+      "label": "Japanese Card",
+      "checks": [
+        { "id": "jp-01", "label": "Card renders with 'Japanese' title" },
+        { "id": "jp-02", "label": "3 subtask rows: Anki, Duolingo, Study session" },
+        { "id": "jp-03", "label": "Each subtask has an individual streak counter" },
+        { "id": "jp-04", "label": "Progress footer shows 'X of 3 done'" },
+        { "id": "jp-05", "label": "Clicking a subtask marks it checked with strike-through" },
+        { "id": "jp-06", "label": "Clicking again unchecks it" },
+        { "id": "jp-07", "label": "Card accent bar turns green when 2+ subtasks checked" },
+        { "id": "jp-08", "label": "Card is done state (green accent + muted style) when 2+ checked" }
+      ]
+    },
+    "dsa_card": {
+      "label": "DSA Card",
+      "checks": [
+        { "id": "dsa-01", "label": "Card renders with 'DSA' title" },
+        { "id": "dsa-02", "label": "3 counters: Easy (green), Med (amber), Hard (red)" },
+        { "id": "dsa-03", "label": "+ and − buttons present for each counter" },
+        { "id": "dsa-04", "label": "All counters start at 0 or last saved value" },
+        { "id": "dsa-05", "label": "Status shows 'Not started' when total is 0" },
+        { "id": "dsa-06", "label": "Tapping + increments count by 1" },
+        { "id": "dsa-07", "label": "Tapping − decrements count; cannot go below 0" },
+        { "id": "dsa-08", "label": "Status shows 'XE · YM · ZH solved' when total > 0" },
+        { "id": "dsa-09", "label": "Card accent bar turns green when total > 0" }
+      ]
+    },
+    "streak_display": {
+      "label": "Streak Display",
+      "checks": [
+        { "id": "str-01", "label": "Streak 0 shows muted/gray flame" },
+        { "id": "str-02", "label": "Streak 1–6 shows amber (warm) flame" },
+        { "id": "str-03", "label": "Streak 7–29 shows orange (hot) flame" },
+        { "id": "str-04", "label": "Streak 30+ shows purple (legendary) flame" },
+        { "id": "str-05", "label": "Flash animation plays briefly on habit completion" }
+      ]
+    },
+    "all_done_banner": {
+      "label": "All Done Banner",
+      "checks": [
+        { "id": "adb-01", "label": "Banner hidden when not all habits complete" },
+        { "id": "adb-02", "label": "Banner visible when all 3 habits done (or gym = rest)" },
+        { "id": "adb-03", "label": "Banner text: 'All habits done — you're locked in'" },
+        { "id": "adb-04", "label": "Banner has slide-down entrance animation" }
+      ]
+    },
+    "gym_workout_drawer": {
+      "label": "Workout Drawer",
+      "checks": [
+        { "id": "drw-01", "label": "Drawer opens when a selected workout type is clicked again" },
+        { "id": "drw-02", "label": "Drawer shows correct workout type title" },
+        { "id": "drw-03", "label": "'Add exercise' button present in drawer" },
+        { "id": "drw-04", "label": "'Done' button present in drawer" },
+        { "id": "drw-05", "label": "Drawer closes on Done click" },
+        { "id": "drw-06", "label": "View-only mode shows transfer banner when switching types with prior logs" }
+      ]
+    },
+    "exercise_card": {
+      "label": "Exercise Card",
+      "checks": [
+        { "id": "ex-01", "label": "Exercise card shows name and weight type label" },
+        { "id": "ex-02", "label": "Expanding card shows set input form" },
+        { "id": "ex-03", "label": "PR badge appears when current max exceeds prior max" },
+        { "id": "ex-04", "label": "Days-since indicator shows urgency colors" },
+        { "id": "ex-05", "label": "Consistency badge shows if 7+ sessions in 30 days" },
+        { "id": "ex-06", "label": "Weight auto-rounds to nearest 2.5 on blur" },
+        { "id": "ex-07", "label": "Weight cannot be below 2.5" },
+        { "id": "ex-08", "label": "Reps counter cannot go below 1" },
+        { "id": "ex-09", "label": "Cable mini-plates capped at 2 per set (note shown)" },
+        { "id": "ex-10", "label": "Time input capped at 59:59 (note shown)" },
+        { "id": "ex-11", "label": "Log button active only when all sets valid" },
+        { "id": "ex-12", "label": "Progress graph opens when chart icon clicked" }
+      ]
+    },
+    "progress_graph": {
+      "label": "Progress Graph",
+      "checks": [
+        { "id": "graph-01", "label": "SVG graph renders with axes and data points" },
+        { "id": "graph-02", "label": "Gold dot present on latest PR session" },
+        { "id": "graph-03", "label": "Tooltip appears on hover with date + value" },
+        { "id": "graph-04", "label": "Max / per-set series toggle works" },
+        { "id": "graph-05", "label": "Y-axis starts from 0" },
+        { "id": "graph-06", "label": "Graph closes on X click" }
+      ]
+    },
+    "visual_regression": {
+      "label": "Visual Regression Screenshots",
+      "checks": [
+        { "id": "vis-01", "label": "Full page dark mode renders without layout breaks" },
+        { "id": "vis-02", "label": "Full page light mode renders without layout breaks" },
+        { "id": "vis-03", "label": "3-column card grid renders correctly" },
+        { "id": "vis-04", "label": "TopBar renders without overflow" },
+        { "id": "vis-05", "label": "Navbar is visible and not obscured" }
+      ]
+    },
+    "network": {
+      "label": "Network & Requests",
+      "checks": [
+        { "id": "net-01", "label": "No requests to unexpected domains (only Supabase + fonts.googleapis.com + fonts.gstatic.com)" },
+        { "id": "net-02", "label": "No response with Content-Disposition: attachment (mystery download bug)" },
+        { "id": "net-03", "label": "No 5xx responses from Supabase" },
+        { "id": "net-04", "label": "No uncaught JS console errors on page load" },
+        { "id": "net-05", "label": "No unexpected fetch/XHR requests after page idle (no runaway polling)" },
+        { "id": "net-06", "label": "Supabase requests use anon key header (not exposing service role key)" }
+      ]
+    }
+  }
+}

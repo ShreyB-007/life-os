@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, forwardRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayStr } from '../lib/date'
 import StreakDisplay from './StreakDisplay'
+import DSAProgressGraph from './DSAProgressGraph'
 
 const DIFFICULTIES = [
   { key: 'easy', label: 'Easy', color: '#10B981' },
@@ -9,10 +10,11 @@ const DIFFICULTIES = [
   { key: 'hard', label: 'Hard', color: '#EF4444' },
 ]
 
-const DSACard = forwardRef(function DSACard({ streak, todayLog, onLog }, ref) {
+const DSACard = forwardRef(function DSACard({ streak, todayLog, allLogs = [], onLog }, ref) {
   const [counts, setCounts] = useState({ easy: 0, med: 0, hard: 0 })
   const [prevDone, setPrevDone] = useState(false)
   const [booped, setBooped] = useState(false)
+  const [showGraph, setShowGraph] = useState(false)
   const saveTimer = useRef(null)
   const countsRef = useRef(counts)
 
@@ -63,6 +65,7 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, onLog }, ref) {
   }
 
   return (
+    <>
     <div
       ref={ref}
       className={[
@@ -82,6 +85,13 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, onLog }, ref) {
           <div className="flex items-center gap-2">
             <i className="ti ti-code text-lg" style={{ color: '#06B6D4' }} />
             <span className="font-display font-semibold text-sm text-os-fg">DSA</span>
+            <button
+              onClick={e => { e.stopPropagation(); setShowGraph(true) }}
+              className="action-pill-btn action-pill-emerald"
+              title="View progress"
+            >
+              <i className="ti ti-chart-line" />
+            </button>
           </div>
           <StreakDisplay count={streak} flash={booped} />
         </div>
@@ -123,6 +133,11 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, onLog }, ref) {
         </div>
       </div>
     </div>
+
+    {showGraph && (
+      <DSAProgressGraph allLogs={allLogs} onClose={() => setShowGraph(false)} />
+    )}
+    </>
   )
 })
 

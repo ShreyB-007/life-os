@@ -216,3 +216,4 @@ After running, write a brief report to qa_reports/code_quality_[timestamp].md li
 ## QA History
 
 - 2026-06-15: Per-set PR graph fixes — 12/12 passed
+- 2026-06-16: 5 changes (global PR dot, rest-day deletes session, DSA graph, cursor glow, pill buttons) — 35/35 passed

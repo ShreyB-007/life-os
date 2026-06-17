@@ -288,6 +288,61 @@ html.dark .gym-rest-btn {
   border-color: var(--input-hover-border);
 }
 
+/* ─── Action pill buttons (exercise card / DSA graph icon) ──── */
+.action-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  min-height: 36px;
+  border-radius: 8px;
+  background: transparent;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 150ms ease;
+}
+
+.action-pill-btn i {
+  font-size: 16px;
+}
+
+.action-pill-btn:hover:not(:disabled) {
+  transform: scale(1.02);
+}
+
+.action-pill-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.action-pill-indigo {
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #6366F1;
+}
+.action-pill-indigo:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.6);
+}
+
+.action-pill-emerald {
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10B981;
+}
+.action-pill-emerald:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.6);
+}
+
+.action-pill-red {
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #EF4444;
+}
+.action-pill-red:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
 /* ─── Goal row progress track ────────────────────────── */
 .progress-track {
   background: var(--track-bg);

@@ -132,14 +132,55 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     setDrawerViewOnly(false)
   }
 
-  // Fix 3: second tap on rest day deselects it
-  function markRest() {
+  // Deletes today's exercise_logs for the given workout type (with no-prior-history
+  // cleanup), mirroring WorkoutDrawer's handleDeleteTodaySession.
+  async function deleteTodaysSessionForType(workoutType) {
+    const today = todayStr()
+    const { data: exs } = await supabase
+      .from('exercises')
+      .select('id')
+      .contains('workout_type_tags', [workoutType])
+    if (!exs?.length) return
+
+    const { data: todayExLogs } = await supabase
+      .from('exercise_logs')
+      .select('id, exercise_id')
+      .in('exercise_id', exs.map(e => e.id))
+      .eq('log_date', today)
+    if (!todayExLogs?.length) return
+
+    for (const log of todayExLogs) {
+      const { data: priorLogs } = await supabase
+        .from('exercise_logs')
+        .select('id')
+        .eq('exercise_id', log.exercise_id)
+        .lt('log_date', today)
+        .limit(1)
+
+      if (!priorLogs?.length) {
+        await supabase.from('exercise_logs').delete().eq('exercise_id', log.exercise_id)
+        await supabase.from('exercises').delete().eq('id', log.exercise_id)
+      } else {
+        await supabase.from('exercise_logs').delete().eq('id', log.id)
+      }
+    }
+  }
+
+  // Rest day is mutually exclusive with a logged session — selecting it clears any
+  // exercises logged today for the active workout type. Fix 3: second tap deselects it.
+  async function markRest() {
     if (isRest) {
       setIsRest(false)
       save(null, false, false)
       return
     }
     if (restLimitReached) return
+
+    const currentType = selected || todayLog?.payload?.workout_type
+    if (currentType && currentType !== 'rest') {
+      await deleteTodaysSessionForType(currentType)
+    }
+
     const wasAlreadyDone = isDone
     setIsRest(true)
     setSelected(null)

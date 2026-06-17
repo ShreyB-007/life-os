@@ -191,52 +191,57 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
 
   const maxSets = Math.max(0, ...sessions.map(s => s.sets?.length || 0))
 
-  // Per-series PR computation: prStyle[seriesKey][sessionIdx] = 'latest' | 'earlier'
-  // 'max' key: PR = new high across all sets that session
-  // 'set0', 'set1', ...: each position tracks its own running max independently
-  const prStyle = (() => {
-    const result = {}
-    if (wt !== 'barbell' && wt !== 'dumbbell' && wt !== 'cable' && wt !== 'reps') return result
+  // Global PR: there is exactly ONE personal record for this exercise — the single
+  // highest value ever recorded, across every session and every set position.
+  // We find it by walking sessions chronologically and tracking a running max; each
+  // time a session's peak value exceeds the running max, that's a candidate PR point.
+  // The last candidate (== the global max) is the pulsing gold dot; every earlier
+  // candidate is a historical PR that was later surpassed (static gold diamond).
+  function prValueAt(sets, pos) {
+    const s = sets?.[pos]
+    if (!s) return null
+    if (wt === 'barbell' || wt === 'dumbbell') return s.weight || 0
+    if (wt === 'cable') return (s.plates || 0) * 7 + (s.mini || 0) * 2.3
+    if (wt === 'reps') return s.reps || 0
+    if (wt === 'time') return s.duration || 0
+    return null
+  }
 
-    function buildPRMap(getVal) {
-      let runMax = -Infinity
-      const prSet = new Set()
-      for (let i = 0; i < n; i++) {
-        const val = getVal(i)
-        if (val == null || val <= 0) continue
-        if (val > runMax) { runMax = val; prSet.add(i) }
+  const globalPR = (() => {
+    let runMax = -Infinity
+    let latest = null
+    const historical = []
+    for (let i = 0; i < n; i++) {
+      const sets = sessions[i]?.sets || []
+      let sessionPeak = -Infinity
+      for (let pos = 0; pos < sets.length; pos++) {
+        const v = prValueAt(sets, pos)
+        if (v != null && v > sessionPeak) sessionPeak = v
       }
-      if (prSet.size === 0) return {}
-      const latest = Math.max(...prSet)
-      const map = {}
-      prSet.forEach(i => { map[i] = i === latest ? 'latest' : 'earlier' })
-      return map
+      if (sessionPeak === -Infinity || sessionPeak <= 0) continue
+      if (sessionPeak > runMax) {
+        let pos = sets.findIndex((_, p) => prValueAt(sets, p) === sessionPeak)
+        if (pos === -1) pos = 0
+        if (latest) historical.push(latest)
+        latest = { sessionIdx: i, pos, value: sessionPeak }
+        runMax = sessionPeak
+      }
     }
-
-    result['max'] = buildPRMap(i => {
-      const sets = sessions[i]?.sets
-      if (!sets?.length) return null
-      const vals = sets.map(s => {
-        if (wt === 'barbell' || wt === 'dumbbell') return s.weight || 0
-        if (wt === 'cable') return (s.plates || 0) * 7 + (s.mini || 0) * 2.3
-        return s.reps || 0
-      })
-      return Math.max(...vals)
-    })
-
-    for (let pos = 0; pos < maxSets; pos++) {
-      result[`set${pos}`] = buildPRMap(i => {
-        const sets = sessions[i]?.sets
-        if (!sets || pos >= sets.length) return null
-        const s = sets[pos]
-        if (wt === 'barbell' || wt === 'dumbbell') return s.weight || 0
-        if (wt === 'cable') return (s.plates || 0) * 7 + (s.mini || 0) * 2.3
-        return s.reps || 0
-      })
-    }
-
-    return result
+    return { latest, historical }
   })()
+
+  function getPRStyle(key, i) {
+    if (!globalPR.latest) return 'normal'
+    if (key === 'max') {
+      if (globalPR.latest.sessionIdx === i) return 'latest'
+      if (globalPR.historical.some(h => h.sessionIdx === i)) return 'earlier'
+      return 'normal'
+    }
+    const pos = parseInt(key.replace('set', ''))
+    if (globalPR.latest.sessionIdx === i && globalPR.latest.pos === pos) return 'latest'
+    if (globalPR.historical.some(h => h.sessionIdx === i && h.pos === pos)) return 'earlier'
+    return 'normal'
+  }
   const seriesOptions = [
     { key: 'max', label: viewMode === 'reps' ? 'Max reps' : 'Max' },
     ...Array.from({ length: maxSets }, (_, i) => ({ key: `set${i}`, label: `Set ${i + 1}` })),
@@ -459,8 +464,8 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
                       const isHov = compareMode
                         ? hovered?.sessionIdx === i
                         : hovered?.seriesKey === key && hovered?.sessionIdx === i
-                      // PR dots per series — each set position tracks its own PR history independently
-                      const dotStyle = prStyle[key]?.[i] || 'normal'
+                      // Global PR — exactly one pulsing gold dot and zero+ static diamonds across the whole graph
+                      const dotStyle = getPRStyle(key, i)
                       const isLatestPR = dotStyle === 'latest'
                       const isEarlierPR = dotStyle === 'earlier'
                       const isPR = isLatestPR || isEarlierPR

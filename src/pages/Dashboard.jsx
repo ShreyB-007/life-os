@@ -126,6 +126,7 @@ export default function Dashboard() {
             ref={dsaCardRef}
             streak={dsaStreak}
             todayLog={todayLogs.dsa}
+            allLogs={logs.dsa}
             onLog={onLog}
           />
         </div>

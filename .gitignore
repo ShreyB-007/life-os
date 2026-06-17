@@ -13,3 +13,5 @@ skills-lock.json
 
 # QA reports (local only)
 qa_reports/
+qa/report/
+test-results/
