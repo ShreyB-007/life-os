@@ -177,7 +177,7 @@ function getDaysStyle(days) {
 
 export default function ExerciseCard({
   exercise, logs, expanded, onToggle, onCollapse,
-  onLogSave, onOpenGraph, onDelete, onAddTag,
+  onLogSave, onOpenGraph, onDelete, onRemoveExercise, onAddTag,
 }) {
   const today = todayStr()
   const wt    = exercise.weight_type
@@ -533,9 +533,15 @@ export default function ExerciseCard({
           <i className="ti ti-chart-line" />
           View graph
         </button>
-        <button onClick={() => onDelete()} className="action-pill-btn action-pill-red">
-          <i className="ti ti-trash" />
-          Delete
+        {todayLog && (
+          <button onClick={() => onDelete()} className="action-pill-btn action-pill-red">
+            <i className="ti ti-trash" />
+            Delete today
+          </button>
+        )}
+        <button onClick={() => onRemoveExercise()} className="action-pill-btn action-pill-red">
+          <i className="ti ti-trash-x" />
+          Remove exercise
         </button>
       </div>
 

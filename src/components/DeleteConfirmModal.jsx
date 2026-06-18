@@ -1,4 +1,4 @@
-export default function DeleteConfirmModal({ exercise, bodyText, confirmText, onConfirm, onCancel }) {
+export default function DeleteConfirmModal({ exercise, bodyText, confirmText, title, onConfirm, onCancel }) {
   const defaultBody = 'This will permanently remove this exercise and all its logged sessions. This cannot be undone.'
 
   return (
@@ -13,7 +13,7 @@ export default function DeleteConfirmModal({ exercise, bodyText, confirmText, on
         style={{ zIndex: 301, background: 'var(--drawer-bg)', border: '1px solid var(--drawer-card-border)' }}
       >
         <h3 className="font-display font-semibold text-base text-os-fg mb-2">
-          Delete {exercise.name}?
+          {title || `Delete ${exercise.name}?`}
         </h3>
         <p className="text-sm font-body text-os-secondary mb-5 leading-relaxed">
           {bodyText || defaultBody}

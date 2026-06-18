@@ -17,6 +17,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
   const [showAdd, setShowAdd]                 = useState(false)
   const [graphExercise, setGraphExercise]     = useState(null)
   const [deleteTarget, setDeleteTarget]       = useState(null)
+  const [removeExTarget, setRemoveExTarget]   = useState(null)
   const [toast, setToast]                     = useState(null)
   const [showTransferBanner, setShowTransferBanner] = useState(false)
   const [transferring, setTransferring]       = useState(false)
@@ -304,6 +305,44 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
     setDeleteTarget(null)
   }
 
+  async function handleRemoveExerciseClick(exercise) {
+    const today = todayStr()
+    const localLogs = logs[exercise.id] || []
+    const localPrior = localLogs.filter(l => l.log_date < today)
+
+    let priorCount = localPrior.length
+
+    if (priorCount === 0) {
+      const { data: dbPrior } = await supabase
+        .from('exercise_logs')
+        .select('id')
+        .eq('exercise_id', exercise.id)
+        .lt('log_date', today)
+
+      priorCount = Array.isArray(dbPrior) ? dbPrior.length : 0
+    }
+
+    const bodyText = priorCount > 0
+      ? `This will permanently delete ${exercise.name} and all ${priorCount} logged session${priorCount !== 1 ? 's' : ''}. This cannot be undone.`
+      : `This will permanently remove ${exercise.name} from your library.`
+
+    setRemoveExTarget({ exercise, bodyText })
+  }
+
+  async function handleRemoveExercise() {
+    const { exercise } = removeExTarget
+    await supabase.from('exercise_logs').delete().eq('exercise_id', exercise.id)
+    const { error } = await supabase.from('exercises').delete().eq('id', exercise.id)
+    if (!error) {
+      setExercises(prev => prev.filter(e => e.id !== exercise.id))
+      setLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
+      showToast(`${exercise.name} removed`)
+    } else {
+      showToast('Delete failed — check permissions')
+    }
+    setRemoveExTarget(null)
+  }
+
   async function handleDeleteTodaySession() {
     if (deletingSession) return
     setDeletingSession(true)
@@ -480,6 +519,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
                   onLogSave={entry => handleLogSave(ex.id, entry)}
                   onOpenGraph={() => setGraphExercise(ex)}
                   onDelete={() => handleDeleteClick(ex)}
+                  onRemoveExercise={() => handleRemoveExerciseClick(ex)}
                   onAddTag={handleAddTag}
                 />
               ))
@@ -542,6 +582,17 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
           confirmText={deleteTarget.hasPriorLogs ? "Delete today's log" : 'Delete permanently'}
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {removeExTarget && (
+        <DeleteConfirmModal
+          title={`Remove ${removeExTarget.exercise.name}?`}
+          exercise={removeExTarget.exercise}
+          bodyText={removeExTarget.bodyText}
+          confirmText="Remove permanently"
+          onConfirm={handleRemoveExercise}
+          onCancel={() => setRemoveExTarget(null)}
         />
       )}
 
