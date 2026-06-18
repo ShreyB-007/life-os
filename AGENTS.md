@@ -1,6 +1,20 @@
-# CLAUDE.md
+# Life OS — Agent Instructions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Project Overview
+
+Personal life tracking dashboard. Single user. React + Vite + TailwindCSS frontend, Supabase backend, deployed on Vercel. Dark mode by default.
+
+## Current Build Status
+
+See HANDOFF.md for current phase, what was last completed, and what to pick up next. **Read HANDOFF.md before doing anything else.**
+
+## Stack
+
+- **Frontend**: React 18, Vite, TailwindCSS
+- **Backend**: Supabase (Postgres + Auth + Realtime)
+- **Deployment**: Vercel (auto-deploy on push to `main`)
+- **Icons**: Tabler Icons outline webfont (CDN)
+- **Fonts**: Syne (display), Outfit (body), JetBrains Mono (mono) — Google Fonts CDN
 
 ## Commands
 
@@ -69,7 +83,7 @@ Schema and seed data live in `supabase_setup.sql`. Run it once in the Supabase S
 - Japanese: `{ subtasks: { anki: bool, duolingo: bool, study: bool } }`
 - DSA: `{ easy: number, med: number, hard: number }`
 
-## Design system
+## Design System
 
 **Fonts** (loaded via Google Fonts in `index.html`):
 - `font-display` → Syne — headings, card titles, banner text
@@ -136,83 +150,6 @@ Additional CSS-only animations defined in `index.css` (not in Tailwind): `cosmic
 
 Tabler Icons outline webfont loaded via CDN in `index.html`. Usage: `<i className="ti ti-{icon-name}" />`. Icon names come from the `icon` column in the `habits` and `goals` tables.
 
-## Automated Agent Workflow
-
-These agents run automatically after EVERY implementation, without being asked. Do not skip them. Do not ask the user to run them manually. This behavior persists across all sessions regardless of context.
-
-### Agent 1: QA Agent
-
-Runs after every implementation. The QA agent operates as if it has zero context about the codebase — it only knows what a user would see and experience. It tests behavior, not code.
-
-Workflow (up to 3 iterations):
-
-ITERATION LOOP:
-1. QA agent generates test scenarios covering:
-   - Happy path (expected normal usage)
-   - Boundary values (0, 1, max, max+1, max-1)
-   - Invalid inputs (wrong type, empty, negative, decimal where not allowed)
-   - Rapid interactions (clicking same button 5x fast)
-   - State transitions (log → unlog → relog, select → deselect → reselect)
-   - Cross-feature interactions (does feature A break when feature B is used)
-   - Edge cases specific to the feature just implemented
-
-2. For each scenario, QA agent predicts the expected behavior, then describes what actually happens based on reading the implementation code. If it cannot determine behavior from code alone, it flags it explicitly.
-
-3. QA agent writes a report to qa_reports/qa_[timestamp].md containing:
-   - PASS: scenario + observed behavior matches expected
-   - FAIL: scenario + expected behavior + actual behavior + likely cause
-   - UNCLEAR: scenario that needs manual verification
-
-4. Main agent reads the report. For each FAIL:
-   - Implements the fix
-   - Marks the fix in the report
-
-5. QA agent re-runs ONLY the failed scenarios from the previous iteration.
-
-6. Repeat up to 3 total iterations. After 3 iterations, log any remaining FAILs to qa_reports/unresolved_[timestamp].md and continue.
-
-After the loop completes, QA agent appends a one-line summary to CLAUDE.md under "## QA History": date + feature + pass rate (e.g. "2026-06-15: PR graph fixes — 11/12 passed, 1 unresolved (tooltip hover on mobile)")
-
-### Agent 2: Code Quality Agent
-
-Runs after QA Agent completes (every session). Checks the entire repo, not just the files changed in this session.
-
-Checklist (fix automatically, do not ask user):
-
-CLEANUP:
-- Remove all console.log, console.warn, console.error statements unless they are inside a try/catch error handler
-- Remove all commented-out code blocks (not comments explaining logic)
-- Remove unused imports in every file
-- Remove unused variables and functions
-- Remove any files in src/ that are not imported anywhere
-
-CONSISTENCY:
-- All date computations use getLocalDate() from src/lib/dateUtils.js — no toISOString() anywhere
-- All card surfaces use the design system from CLAUDE.md (inline styles for dark surfaces, not dark: Tailwind classes)
-- All fonts use the three defined families: Syne, Outfit, JetBrains Mono
-- All streak displays use the StreakDisplay component, not ad-hoc implementations
-- All Supabase writes include explicit log_date: getLocalDate()
-
-PERFORMANCE:
-- No useEffect with missing or incorrect dependency arrays
-- No unnecessary re-renders (check for object/array literals created inline in JSX that should be memoized)
-- No fetch calls inside render functions without caching
-- Images and SVGs are not re-created on every render
-
-ARCHITECTURE:
-- No hardcoded user data (gym type names, exercise names, etc.) in component files — these come from Supabase or config
-- No business logic inside JSX return statements — extract to functions
-- No prop drilling more than 2 levels deep without justification
-- Environment variables: verify no VITE_ vars are logged or exposed in error messages
-
-After running, write a brief report to qa_reports/code_quality_[timestamp].md listing what was found and fixed. If nothing needed fixing, write "No issues found."
-
-### Execution order per session:
-1. Implement the requested feature/fix
-2. Run QA Agent (up to 3 iterations)
-3. Run Code Quality Agent
-4. Commit with message format: "feat/fix: [description] — QA: X/Y passed"
-
 ## Session Handoff Protocol
 
 ### Session Start (always do this first):
@@ -268,8 +205,86 @@ Pass rate: [X/Y passed]
 Report: qa_reports/[filename]
 ```
 
-## QA History
+## Automated Agent Workflow
 
-- 2026-06-15: Per-set PR graph fixes — 12/12 passed
-- 2026-06-16: 5 changes (global PR dot, rest-day deletes session, DSA graph, cursor glow, pill buttons) — 35/35 passed
-- 2026-06-18: Split delete buttons (hide today-delete when unlogged, add permanent remove) — 15/15 passed
+These agents run automatically after EVERY implementation, without being asked. Do not skip them. Do not ask the user to run them manually. This behavior persists across all sessions regardless of context.
+
+### Agent 1: QA Agent
+
+Runs after every implementation. The QA agent operates as if it has zero context about the codebase — it only knows what a user would see and experience. It tests behavior, not code.
+
+Workflow (up to 3 iterations):
+
+ITERATION LOOP:
+1. QA agent generates test scenarios covering:
+   - Happy path (expected normal usage)
+   - Boundary values (0, 1, max, max+1, max-1)
+   - Invalid inputs (wrong type, empty, negative, decimal where not allowed)
+   - Rapid interactions (clicking same button 5x fast)
+   - State transitions (log → unlog → relog, select → deselect → reselect)
+   - Cross-feature interactions (does feature A break when feature B is used)
+   - Edge cases specific to the feature just implemented
+
+2. For each scenario, QA agent predicts the expected behavior, then describes what actually happens based on reading the implementation code. If it cannot determine behavior from code alone, it flags it explicitly.
+
+3. QA agent writes a report to qa_reports/qa_[timestamp].md containing:
+   - PASS: scenario + observed behavior matches expected
+   - FAIL: scenario + expected behavior + actual behavior + likely cause
+   - UNCLEAR: scenario that needs manual verification
+
+4. Main agent reads the report. For each FAIL:
+   - Implements the fix
+   - Marks the fix in the report
+
+5. QA agent re-runs ONLY the failed scenarios from the previous iteration.
+
+6. Repeat up to 3 total iterations. After 3 iterations, log any remaining FAILs to qa_reports/unresolved_[timestamp].md and continue.
+
+After the loop completes, QA agent appends a one-line summary to CLAUDE.md under "## QA History": date + feature + pass rate.
+
+### Agent 2: Code Quality Agent
+
+Runs after QA Agent completes (every session). Checks the entire repo, not just the files changed in this session.
+
+Checklist (fix automatically, do not ask user):
+
+CLEANUP:
+- Remove all console.log, console.warn, console.error statements unless they are inside a try/catch error handler
+- Remove all commented-out code blocks (not comments explaining logic)
+- Remove unused imports in every file
+- Remove unused variables and functions
+- Remove any files in src/ that are not imported anywhere
+
+CONSISTENCY:
+- All date computations use getLocalDate() from src/lib/dateUtils.js — no toISOString() anywhere
+- All card surfaces use the design system from AGENTS.md (inline styles for dark surfaces, not dark: Tailwind classes)
+- All fonts use the three defined families: Syne, Outfit, JetBrains Mono
+- All streak displays use the StreakDisplay component, not ad-hoc implementations
+- All Supabase writes include explicit log_date: getLocalDate()
+
+PERFORMANCE:
+- No useEffect with missing or incorrect dependency arrays
+- No unnecessary re-renders (check for object/array literals created inline in JSX that should be memoized)
+- No fetch calls inside render functions without caching
+- Images and SVGs are not re-created on every render
+
+ARCHITECTURE:
+- No hardcoded user data (gym type names, exercise names, etc.) in component files — these come from Supabase or config
+- No business logic inside JSX return statements — extract to functions
+- No prop drilling more than 2 levels deep without justification
+- Environment variables: verify no VITE_ vars are logged or exposed in error messages
+
+After running, write a brief report to qa_reports/code_quality_[timestamp].md listing what was found and fixed. If nothing needed fixing, write "No issues found."
+
+### Agent 3: Update HANDOFF.md
+
+After QA and code quality agents complete, overwrite HANDOFF.md with the current session state using the format defined in the Session Handoff Protocol above. Commit HANDOFF.md together with any source changes.
+
+### Execution order per session:
+1. Read HANDOFF.md (session start)
+2. Implement the requested feature/fix
+3. Run QA Agent (up to 3 iterations)
+4. Run Code Quality Agent
+5. Update HANDOFF.md
+6. Commit with message format: "feat/fix: [description] — QA: X/Y passed"
+7. `git push origin main`
