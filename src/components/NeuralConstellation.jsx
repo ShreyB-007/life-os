@@ -4,8 +4,11 @@ import { createPortal } from 'react-dom'
 const NODE_COUNT = 28
 const CONNECTION_DIST = 150
 const CURSOR_PULL_DIST = 220
-const CURSOR_PULL_STRENGTH = 0.16     // 3× stronger than before
+const CURSOR_PULL_SCALE = 0.7
 const CURSOR_GLOW_DIST = 90
+const MIN_DISTANCE = 90
+const REPULSION_STRENGTH = 0.4
+const MAX_VELOCITY = 1.5
 const PULSE_DURATION = 800
 const GLOW_DECAY = 0.96
 const CELEBRATION_DURATION = 3000
@@ -230,16 +233,38 @@ const NeuralConstellation = forwardRef(function NeuralConstellation({ allDone },
           const dy = cursor.y - n.y
           const dist = Math.hypot(dx, dy)
           if (dist > 0 && dist < CURSOR_PULL_DIST) {
-            const strength = (1 - dist / CURSOR_PULL_DIST) * theme.pullStrength
+            const strength = (1 - dist / CURSOR_PULL_DIST) * theme.pullStrength * CURSOR_PULL_SCALE
             n.vx += (dx / dist) * strength
             n.vy += (dy / dist) * strength
           }
         }
+      })
 
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const a = nodes[i]
+          const b = nodes[j]
+          const dx = a.x - b.x
+          const dy = a.y - b.y
+          const distance = Math.hypot(dx, dy)
+
+          if (distance < MIN_DISTANCE && distance > 0) {
+            const force = REPULSION_STRENGTH * (MIN_DISTANCE - distance) / MIN_DISTANCE
+            const nx = dx / distance
+            const ny = dy / distance
+            a.vx += nx * force
+            a.vy += ny * force
+            b.vx -= nx * force
+            b.vy -= ny * force
+          }
+        }
+      }
+
+      nodes.forEach(n => {
         n.vx *= 0.98
         n.vy *= 0.98
-        const speed = Math.hypot(n.vx, n.vy)
-        if (speed > 1.5) { n.vx = (n.vx / speed) * 1.5; n.vy = (n.vy / speed) * 1.5 }
+        n.vx = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, n.vx))
+        n.vy = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, n.vy))
 
         n.x += n.vx
         n.y += n.vy

@@ -1,18 +1,17 @@
 # Life OS — Handoff Log
 
 ## Meta
-Last updated: 2026-06-18T00:00:00+05:30
-Last updated by: Claude Code
+Last updated: 2026-06-19T18:08:21.4950414+05:30
+Last updated by: Codex
 Current phase: Phase 2 — Gym Workout Tracker
 
 ## Just Completed (this session)
-- Split exercise card delete buttons: ti-trash "Delete today" hidden when no today log exists (fully absent, not disabled)
-- Added ti-trash-x "Remove exercise" button — always visible, permanently deletes exercise + all historical logs
-- Separate confirmation modal for remove (title "Remove X?", body varies based on prior log count, confirm "Remove permanently")
-- Added optional `title` prop to DeleteConfirmModal for distinct modal headings
-- Created AGENTS.md for Codex cross-agent handoff
-- Added Session Handoff Protocol section to CLAUDE.md
-- Created this HANDOFF.md
+- Fixed GymCard so selecting Push/Pull/Legs/Cardio is visual-only until the first successful exercise set save.
+- Added first-exercise confirmation flow from ExerciseCard -> WorkoutDrawer -> GymCard before writing gym `habit_logs`.
+- Replaced transfer flow with sequential fetch, target upsert, awaited source `exercise_logs.delete()`, cleanup, habit payload update, and local refresh.
+- Fixed DSA persistence by removing debounce, saving every counter change immediately with `getLocalDate()`, and logging upsert errors.
+- Added neural constellation inter-node repulsion and reduced cursor pull strength by 30%.
+- Ran production build, code-reading QA agent, code quality agent, and browser QA.
 
 ## In Progress (incomplete — pick up here first)
 None — see Queued Next.
@@ -20,84 +19,54 @@ None — see Queued Next.
 ## Queued Next (in priority order)
 1. Phase 3 kickoff — Goals page: build out the Goals page (`src/pages/Goals.jsx` is currently a stub). The goals table exists in Supabase (`supabase_setup.sql`). Implement goal creation, progress tracking, and display using the existing GoalsSection component as a starting point (`src/components/GoalsSection.jsx`).
 2. Phase 3 — Masters Research Agent: build out the Masters page (`src/pages/Masters.jsx` is currently a stub). Purpose TBD by user — ask on session start if no further instructions are in this file.
-3. Phase 2 final polish (if user requests): any remaining gym tracker UX issues the user identifies.
+3. Phase 2 final polish: address any remaining gym tracker UX issues the user identifies.
 
 ## Phase Completion Status
 -> Phase 1 (Dashboard + Habits): ✅ Complete
--> Phase 2 (Gym Workout Tracker): ✅ Feature-complete — all core functionality shipped, final polish done
+-> Phase 2 (Gym Workout Tracker): ✅ Feature-complete — latest gym confirmation, transfer, and persistence fixes shipped
 -> Phase 3 (Goals Page + Masters Research Agent): ⏳ Not started — stubs exist at src/pages/Goals.jsx and src/pages/Masters.jsx
 -> Phase 4 (News Feeds — Gemini): ⏳ Not started
 -> Phase 5 (Weekly Review + Polish): ⏳ Not started
 
 ## Known Working Features (do not regress these)
-**Dashboard / Habits:**
-- Gym, Japanese, DSA habit cards with streak tracking
-- Overall streak in TopBar (all 3 habits required; gym rest day counts)
-- AllDoneBanner on completing all 3 habits
-- Optimistic updates on all habit logs
-- Per-habit streak tiers: cold / warm (1–6) / hot (7–29) / legendary (30+) with animations
-- Streak flash animation on habit completion
-- Light / dark mode toggle (dark default)
-- NeuralConstellation canvas background with pulse on habit completion
-- FloatingIcons with cursor magnetic drift
-- Cursor spotlight effect
-
-**Gym Tracker (WorkoutDrawer + ExerciseCard):**
-- Four workout types: Push, Pull, Legs, Cardio — each opens its own drawer
-- Rest day button on GymCard with max 2/week cap (warning at 1, disabled at 2)
-- Rest day overrides and deletes any previously logged session for that day
-- Per-exercise set logging with weight types: barbell, dumbbell, cable, reps, time
-- Cable weight formula: (plates × 7) + (mini × 2.3) kg; max 2 mini-plates per set
-- Barbell/dumbbell weights must be multiples of 2.5 kg; min 2.5 kg
-- Default 1 set with 0 placeholder on expand; ± set controls
-- Live PR detection (debounced 300ms) — shows 🏆 PR! badge on card header
-- Per-set PR detection in progress graph (gold dot with pulse animation)
-- Particle burst on log save (more particles for PR)
-- View graph button → ProgressGraph modal with full session history
-- DSA progress graph (DSAProgressGraph component)
-- Progressive overload comparison arrows (↑↓) on inputs vs last session
-- "Days since" urgency indicator per exercise (green → amber → red → pulse at 14+)
-- 30-day streak badge on exercise header if ≥7 sessions in last 30 days
-- Tag exercises to multiple workout types (ti-tag-plus button)
-- Transfer session between workout types (banner + confirm flow)
-- History drawer (HistoryDrawer component) for viewing past sessions
-- View-only drawer mode (when opening a past workout type)
-- "Delete today" button (ti-trash) — visible only when today is logged; deletes just today's log, or entire exercise if no prior history
-- "Remove exercise" button (ti-trash-x) — always visible; permanently deletes exercise + all logs with confirmation modal
-- "Delete today's session" bottom bar button — deletes all exercise logs for current workout type today
-- Add exercise modal with duplicate detection (normalized name matching)
-- Atmospheric cursor glow inside drawer (CSS vars, direct DOM writes)
-- Pill-style action buttons (View graph, Delete today, Remove exercise)
+- Gym, Japanese, and DSA habit cards with streak tracking.
+- Overall streak in TopBar; gym done, gym rest day, or Sunday can satisfy gym.
+- AllDoneBanner appears when all three daily habits are satisfied.
+- Gym workout type selection opens the workout drawer without marking gym done until an exercise set is saved.
+- Rest day still writes immediately and enforces max 2 rest days per Mon-Sun week.
+- WorkoutDrawer supports exercise logging, add exercise, graph view, delete today, remove exercise, session delete, and transfer.
+- Transfer moves today's source logs into the target type and deletes source `exercise_logs` with a direct awaited delete call.
+- DSA counters save immediately and restore from today's `habit_logs.payload` on reload.
+- NeuralConstellation cursor attraction remains active while node repulsion prevents pile-ups.
+- Light/dark theme toggle, FloatingIcons, cursor spotlight, and canvas background remain active.
 
 ## Decisions Made (do not reverse without explicit user instruction)
-- Dark mode is default, light mode is secondary
-- `getLocalDate()` from `src/lib/dateUtils.js` for ALL date computations — never `toISOString().slice(0,10)`
-- No decimal inputs anywhere except barbell/dumbbell weight (multiples of 2.5 only)
-- Cable weight = (plates × 7) + (mini × 2.3) kg
-- Exercise library is global (not per-workout-type); `workout_type_tags` array controls which drawers show an exercise
-- Overall streak requires all 3 habits done (gym done OR rest day OR Sunday counts as gym)
-- Rest day overrides and deletes any logged session for that day (not just marks rest)
-- Gym streak `restDays = [0]` (Sundays skipped automatically)
-- Max 2 rest days per Mon–Sun calendar week for gym
-- `allDone` is derived from `todayLogs` on every render — never stored as state
-- Optimistic updates before Supabase writes on all habit and exercise logs
-- Card surfaces use CSS classes (`habit-card`, `habit-card-done`, `drawer-card-bg`) not Tailwind dark: classes
-- All Supabase writes use `onConflict` upsert — never blind inserts
-- No linter or test runner configured (by choice — keep setup simple)
-- Every session ends with `git push origin main` to trigger Vercel auto-deploy
+- Dark mode is default, light mode is secondary.
+- `getLocalDate()` / `todayStr()` local-date utilities are required for all app date comparisons; do not use UTC date slicing.
+- Gym workout type selection is not a completed gym habit until at least one exercise set is saved.
+- Rest day is the only gym path that can immediately satisfy gym without exercise logs.
+- Transfer must delete source `exercise_logs` with `supabase.from('exercise_logs').delete().in('exercise_id', sourceExerciseIds).eq('log_date', getLocalDate())`.
+- DSA saves immediately on every counter adjustment; no debounce is currently used.
+- Card surfaces use CSS classes (`habit-card`, `habit-card-done`, `drawer-card-bg`) instead of Tailwind dark surface classes.
+- Every session ends with `git push origin main` to trigger Vercel auto-deploy.
 
 ## Unresolved Issues
 None.
 
 ## Files Changed This Session
-- `src/components/ExerciseCard.jsx` — added `onRemoveExercise` prop; ti-trash conditional on `todayLog`; added ti-trash-x button
-- `src/components/WorkoutDrawer.jsx` — added `removeExTarget` state, `handleRemoveExerciseClick`, `handleRemoveExercise`, second DeleteConfirmModal
-- `src/components/DeleteConfirmModal.jsx` — added optional `title` prop
-- `AGENTS.md` — created (new file)
-- `CLAUDE.md` — added Session Handoff Protocol section, updated QA History
-- `HANDOFF.md` — created (new file)
+- `src/components/GymCard.jsx` — deferred gym habit completion until confirmed exercise log; added pending selection rollback and confirmed workout status.
+- `src/components/WorkoutDrawer.jsx` — replaced transfer flow and added first-exercise confirmation callback.
+- `src/components/ExerciseCard.jsx` — reports saved exercise logs only after successful Supabase upsert.
+- `src/components/DSACard.jsx` — removed debounce, saved immediately with `getLocalDate()`, added explicit upsert error logging.
+- `src/components/NeuralConstellation.jsx` — added pairwise node repulsion, velocity clamp, and reduced cursor pull.
+- `qa_reports/qa_20260619_gym_dsa_transfer_constellation.md` — QA Agent report.
+- `qa_reports/code_quality_20260619.md` — Code Quality Agent report.
+- `CLAUDE.md` — appended QA History entry.
+- `HANDOFF.md` — refreshed session handoff.
 
 ## QA Status
-Last QA run: 2026-06-18
-Pass rate: 15/15 passed
-Report: qa_reports/qa_20260618_delete_buttons.md
+Last QA run: 2026-06-19T18:08:21.4950414+05:30
+Pass rate: 20/20 passed
+Report: qa_reports/qa_20260619_gym_dsa_transfer_constellation.md
+
+Additional browser QA: 28/30 Playwright checks passed. The 2 failures were sandbox external-resource failures (`ERR_NETWORK_ACCESS_DENIED` for font/resource loading, causing the Tabler flame icon visibility check to fail), not regressions in the implemented fixes.

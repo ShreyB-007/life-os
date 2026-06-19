@@ -448,11 +448,17 @@ export default function ExerciseCard({
     const isPR = checkPR(payload)
     setPrBadge(isPR)
 
-    onLogSave({ ...entry, id: todayLog?.id ?? `opt-${Date.now()}` })
     setSaving(true)
-    setSaved(true)
-    await supabase.from('exercise_logs').upsert(entry, { onConflict: 'exercise_id,log_date' })
+    const { data: savedEntry, error } = await supabase
+      .from('exercise_logs')
+      .upsert(entry, { onConflict: 'exercise_id,log_date' })
+      .select()
+      .single()
     setSaving(false)
+    if (error) return
+
+    setSaved(true)
+    onLogSave(savedEntry || { ...entry, id: todayLog?.id ?? `opt-${Date.now()}` })
 
     spawnParticles(logBtnRef.current, isPR)
     if (isPR) {

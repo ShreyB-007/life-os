@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, forwardRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { todayStr } from '../lib/date'
+import { getLocalDate } from '../lib/dateUtils'
 import StreakDisplay from './StreakDisplay'
 import DSAProgressGraph from './DSAProgressGraph'
 
@@ -15,7 +15,6 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, allLogs = [], on
   const [prevDone, setPrevDone] = useState(false)
   const [booped, setBooped] = useState(false)
   const [showGraph, setShowGraph] = useState(false)
-  const saveTimer = useRef(null)
   const countsRef = useRef(counts)
 
   useEffect(() => {
@@ -24,6 +23,10 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, allLogs = [], on
       const loaded = { easy, med, hard }
       setCounts(loaded)
       countsRef.current = loaded
+    } else {
+      const empty = { easy: 0, med: 0, hard: 0 }
+      setCounts(empty)
+      countsRef.current = empty
     }
   }, [todayLog])
 
@@ -41,27 +44,31 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, allLogs = [], on
     }
   }, [isDone])
 
+  async function saveCounts(next) {
+    const totalQuestions = next.easy + next.med + next.hard
+    const logEntry = {
+      habit_key: 'dsa',
+      log_date: getLocalDate(),
+      done: totalQuestions > 0,
+      is_rest_day: false,
+      payload: { easy: next.easy, med: next.med, hard: next.hard },
+      logged_at: new Date().toISOString(),
+    }
+
+    onLog('dsa', logEntry)
+
+    const { error } = await supabase
+      .from('habit_logs')
+      .upsert(logEntry, { onConflict: 'habit_key,log_date' })
+    if (error) console.error('DSA save failed:', error)
+  }
+
   function adjust(key, delta) {
     const prev = countsRef.current
     const next = { ...prev, [key]: Math.max(0, prev[key] + delta) }
     countsRef.current = next
     setCounts(next)
-
-    const newTotal = next.easy + next.med + next.hard
-    const logEntry = {
-      habit_key: 'dsa',
-      log_date: todayStr(),
-      done: newTotal > 0,
-      is_rest_day: false,
-      payload: next,
-      logged_at: new Date().toISOString(),
-    }
-    onLog('dsa', logEntry)
-
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => {
-      supabase.from('habit_logs').upsert(logEntry, { onConflict: 'habit_key,log_date' })
-    }, 1000)
+    saveCounts(next)
   }
 
   return (

@@ -31,6 +31,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
   const [drawerFromType, setDrawerFromType]      = useState(null)
   const [drawerViewOnly, setDrawerViewOnly]      = useState(false)
   const [historyOpen, setHistoryOpen]            = useState(false)
+  const [locallyConfirmedType, setLocallyConfirmedType] = useState(null)
 
   useEffect(() => {
     if (todayLog) {
@@ -38,20 +39,28 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
       if (wt === 'rest') {
         setIsRest(true)
         setSelected(null)
+        setLocallyConfirmedType(null)
       } else if (wt) {
         setSelected(wt)
         setIsRest(false)
+        setLocallyConfirmedType(todayLog.done ? wt : null)
       } else if (!todayLog.done) {
         setSelected(null)
         setIsRest(false)
+        setLocallyConfirmedType(null)
       }
     } else {
       setSelected(null)
       setIsRest(false)
+      setLocallyConfirmedType(null)
     }
   }, [todayLog])
 
-  const isDone = selected !== null || isRest
+  const confirmedWorkoutType =
+    todayLog?.done && todayLog.payload?.workout_type && todayLog.payload.workout_type !== 'rest'
+      ? todayLog.payload.workout_type
+      : locallyConfirmedType
+  const isDone = Boolean(confirmedWorkoutType) || isRest
 
   const mondayStr = getMondayStr()
   const weekRestCount = allLogs.filter(l => l.is_rest_day && l.log_date >= mondayStr).length
@@ -113,11 +122,9 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
   }
 
   function doSelect(type, fromType = null) {
-    const wasAlreadyDone = isDone
     setSelected(type)
     setIsRest(false)
-    save(type, false, true)
-    if (!wasAlreadyDone) triggerBoop()
+    setLocallyConfirmedType(null)
     setDrawerWorkoutType(type)
     setDrawerFromType(fromType)
     setDrawerOpen(true)
@@ -126,6 +133,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
   function handleDeleteSession() {
     setSelected(null)
     setIsRest(false)
+    setLocallyConfirmedType(null)
     save(null, false, false)
     setDrawerOpen(false)
     setDrawerFromType(null)
@@ -184,6 +192,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     const wasAlreadyDone = isDone
     setIsRest(true)
     setSelected(null)
+    setLocallyConfirmedType(null)
     save('rest', true, true)
     if (!wasAlreadyDone) triggerBoop()
   }
@@ -201,9 +210,21 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
   }
 
   function handleDrawerClose() {
+    if (selected && selected !== confirmedWorkoutType) {
+      setSelected(confirmedWorkoutType || null)
+    }
     setDrawerOpen(false)
     setDrawerFromType(null)
     setDrawerViewOnly(false)
+  }
+
+  function handleExerciseLogged(workoutType) {
+    const wasAlreadyDone = isDone
+    setSelected(workoutType)
+    setIsRest(false)
+    setLocallyConfirmedType(workoutType)
+    save(workoutType, false, true)
+    if (!wasAlreadyDone) triggerBoop()
   }
 
   function handleTransferComplete(targetType) {
@@ -211,6 +232,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     setDrawerViewOnly(false)
     setDrawerFromType(null)
     setDrawerWorkoutType(targetType)
+    setLocallyConfirmedType(targetType)
     // Propagate to Dashboard so todayLogs updates and GymCard's selected re-syncs via useEffect
     onLog('gym', {
       habit_key: 'gym',
@@ -221,6 +243,14 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
       logged_at: new Date().toISOString(),
     })
   }
+
+  const statusText = isRest
+    ? 'Rest day — streak saved'
+    : selected && selected === confirmedWorkoutType
+      ? `Done — ${selected}`
+      : selected
+        ? `${selected} selected — log an exercise to confirm`
+        : 'Select workout'
 
   return (
     <>
@@ -298,7 +328,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
 
             <div className="flex items-center gap-2">
               <span className="text-xs font-body" style={{ color: isDone ? '#10b981' : 'var(--os-muted)' }}>
-                {isRest ? 'Rest day — streak saved' : selected ? `Done — ${selected}` : 'Select workout'}
+                {statusText}
               </span>
               {selected && !isRest && (
                 <button
@@ -323,6 +353,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
           onClose={handleDrawerClose}
           onDone={handleDrawerClose}
           onDeleteSession={handleDeleteSession}
+          onFirstExerciseLogged={handleExerciseLogged}
           onTransferComplete={handleTransferComplete}
         />
       )}
