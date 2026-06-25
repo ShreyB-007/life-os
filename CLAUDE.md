@@ -274,4 +274,5 @@ Report: qa_reports/[filename]
 - 2026-06-16: 5 changes (global PR dot, rest-day deletes session, DSA graph, cursor glow, pill buttons) — 35/35 passed
 - 2026-06-18: Split delete buttons (hide today-delete when unlogged, add permanent remove) — 15/15 passed
 - 2026-06-19: Gym confirmation, transfer delete, DSA persistence, constellation repulsion - 20/20 code-reading QA passed; browser QA 28/30 with sandboxed external-resource failures
+- 2026-06-25: Category-scoped exercise deletion (workout_type column, scoped delete/remove, history grouping, transfer) — 8/8 passed
 

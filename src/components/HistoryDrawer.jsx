@@ -6,6 +6,7 @@ import ProgressGraph from './ProgressGraph'
 import DeleteConfirmModal from './DeleteConfirmModal'
 
 const WORKOUT_TYPES = ['Push', 'Pull', 'Legs', 'Cardio']
+const WORKOUT_EMOJIS = { Push: '💪', Pull: '🏋️', Legs: '🦵', Cardio: '🏃' }
 
 // ── Shared form utilities (mirror of ExerciseCard) ──────────────────────────
 
@@ -208,10 +209,10 @@ function InlineSessionEditor({ log, exercise, onSave, onCancel }) {
     if (!formValid) return
     const payload = buildPayload(sets, wt)
     setSaving(true)
-    const entry = { exercise_id: exercise.id, log_date: log.log_date, sets: payload }
+    const entry = { exercise_id: exercise.id, log_date: log.log_date, sets: payload, workout_type: log.workout_type || '' }
     const { data: saved } = await supabase
       .from('exercise_logs')
-      .upsert({ ...entry, id: log.id }, { onConflict: 'exercise_id,log_date' })
+      .upsert({ ...entry, id: log.id }, { onConflict: 'exercise_id,log_date,workout_type' })
       .select().single()
     setSaving(false)
     onSave({ ...log, sets: payload, ...(saved || {}) })
@@ -342,6 +343,7 @@ function HistoryExerciseCard({ exercise, logs, dateFilter, editState, onOpenGrap
   const today = todayStr()
   const mostRecent = logs[0] ?? null
   const days = daysSince(mostRecent?.log_date ?? null)
+  const isMultiTag = (exercise.workout_type_tags || []).length > 1
 
   const displayLogs = dateFilter === 'today'
     ? logs.filter(l => l.log_date === today)
@@ -438,6 +440,64 @@ function HistoryExerciseCard({ exercise, logs, dateFilter, editState, onOpenGrap
         <p className="text-xs font-body text-os-muted">
           {dateFilter === 'today' ? 'No workout logged today' : 'No sessions logged yet'}
         </p>
+      ) : isMultiTag ? (
+        // Grouped by workout_type for exercises that appear in multiple categories
+        <div>
+          {(exercise.workout_type_tags || []).map(type => {
+            const source = dateFilter === 'today' ? displayLogs : logs
+            const typeLogs = source
+              .filter(l => (l.workout_type || exercise.primary_workout_type) === type)
+              .slice(0, 5)
+            if (!typeLogs.length) return null
+            return (
+              <div key={type}>
+                <div className="flex items-center gap-1.5 mt-2 mb-1">
+                  <span className="text-[10px] font-body text-os-muted">{WORKOUT_EMOJIS[type] || '🏋️'} {type} Day</span>
+                  <div className="flex-1 h-px" style={{ background: 'var(--drawer-card-border)' }} />
+                </div>
+                <div className="space-y-1.5">
+                  {typeLogs.map(log => {
+                    const isEditing = editState?.exerciseId === exercise.id && editState?.logId === log.id
+                    const isToday = log.log_date === today
+                    const isPRSession = prSessionDates.has(log.log_date)
+                    return (
+                      <div key={log.id}>
+                        <div
+                          className="flex items-center gap-2 text-xs font-body rounded-lg px-2 py-1"
+                          style={isToday ? {
+                            border: '1px solid rgba(16,185,129,0.45)',
+                            background: 'rgba(16,185,129,0.04)',
+                            boxShadow: '0 0 10px rgba(16,185,129,0.08)',
+                          } : isPRSession ? {
+                            border: '1px solid rgba(245,158,11,0.35)',
+                            background: 'rgba(245,158,11,0.04)',
+                          } : {}}
+                        >
+                          <span className="text-os-muted flex-shrink-0 w-12">{fmtDate(log.log_date)}</span>
+                          {isToday && (
+                            <span className="text-[9px] font-mono px-1 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>Today</span>
+                          )}
+                          {isPRSession && !isToday && (
+                            <i className="ti ti-trophy text-[11px] flex-shrink-0" style={{ color: '#F59E0B' }} />
+                          )}
+                          <span className="text-os-secondary flex-1 min-w-0 truncate">{fmtSets(log, wt)}</span>
+                          {!isEditing && (
+                            <button onClick={() => onStartEdit(exercise.id, log.id, log)} className="p-0.5 rounded text-os-muted hover:text-os-fg transition-colors flex-shrink-0 ml-1" title="Edit session">
+                              <i className="ti ti-pencil text-xs" />
+                            </button>
+                          )}
+                        </div>
+                        {isEditing && (
+                          <InlineSessionEditor log={log} exercise={exercise} onSave={updatedLog => onSaveEdit(exercise.id, updatedLog)} onCancel={onCancelEdit} />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       ) : (
         <div className="space-y-1.5">
           {displayLogs.map(log => {

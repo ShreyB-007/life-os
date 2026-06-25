@@ -178,6 +178,7 @@ function getDaysStyle(days) {
 export default function ExerciseCard({
   exercise, logs, expanded, onToggle, onCollapse,
   onLogSave, onOpenGraph, onDelete, onRemoveExercise, onAddTag,
+  workoutType,
 }) {
   const today = todayStr()
   const wt    = exercise.weight_type
@@ -441,6 +442,7 @@ export default function ExerciseCard({
       log_date: today,
       sets: payload,
       logged_at: new Date().toISOString(),
+      workout_type: workoutType || '',
     }
     // Compute the PR verdict synchronously against the payload actually being saved —
     // don't trust prBadge, which is debounced 300ms and can be stale if the user
@@ -451,7 +453,7 @@ export default function ExerciseCard({
     setSaving(true)
     const { data: savedEntry, error } = await supabase
       .from('exercise_logs')
-      .upsert(entry, { onConflict: 'exercise_id,log_date' })
+      .upsert(entry, { onConflict: 'exercise_id,log_date,workout_type' })
       .select()
       .single()
     setSaving(false)
@@ -546,8 +548,8 @@ export default function ExerciseCard({
           </button>
         )}
         <button onClick={() => onRemoveExercise()} className="action-pill-btn action-pill-red">
-          <i className="ti ti-trash-x" />
-          Remove exercise
+          <i className="ti ti-tag-off" />
+          Remove from {workoutType}
         </button>
       </div>
 

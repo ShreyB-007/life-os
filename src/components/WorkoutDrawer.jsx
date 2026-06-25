@@ -72,6 +72,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
         .from('exercise_logs')
         .select('*')
         .in('exercise_id', ids)
+        .eq('workout_type', workoutType)
         .order('log_date', { ascending: false })
 
       const map = {}
@@ -97,6 +98,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
       .select('id')
       .in('exercise_id', fromExs.map(e => e.id))
       .eq('log_date', today)
+      .eq('workout_type', fromType)
 
     if (fromLogs?.length) setShowTransferBanner(true)
   }
@@ -120,6 +122,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
         .select('*')
         .in('exercise_id', sourceExerciseIds)
         .eq('log_date', today)
+        .eq('workout_type', fromType)
 
       if (!fromLogs?.length) { setShowTransferBanner(false); return }
 
@@ -172,16 +175,18 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
           log_date: log.log_date,
           sets: log.sets,
           logged_at: log.logged_at,
-        }, { onConflict: 'exercise_id,log_date' })
+          workout_type: workoutType,
+        }, { onConflict: 'exercise_id,log_date,workout_type' })
         if (upsertErr) throw upsertErr
       }
 
-      // Step 3: explicitly delete all of today's logs from source exercises.
+      // Step 3: explicitly delete all of today's logs from source exercises (source type only).
       const { error: deleteErr } = await supabase
         .from('exercise_logs')
         .delete()
         .in('exercise_id', sourceExerciseIds)
         .eq('log_date', getLocalDate())
+        .eq('workout_type', fromType)
       if (deleteErr) {
         console.error('Transfer source delete failed:', deleteErr)
         showToast('Transfer failed - source logs were not deleted')
@@ -266,11 +271,11 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
 
   async function handleDeleteClick(exercise) {
     const today = todayStr()
-    // Use local state as primary source (fetchData loaded all logs)
+    const isMultiTag = (exercise.workout_type_tags || []).length > 1
+    // logs[] is already filtered by workoutType (from fetchData), so prior count is per-category
     const localLogs = logs[exercise.id] || []
     const localPrior = localLogs.filter(l => l.log_date < today)
 
-    // Confirm with DB if local says no prior logs (critical path)
     let hasPriorLogs = localPrior.length > 0
     let priorCount   = localPrior.length
 
@@ -279,6 +284,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
         .from('exercise_logs')
         .select('id')
         .eq('exercise_id', exercise.id)
+        .eq('workout_type', workoutType)
         .lt('log_date', today)
 
       hasPriorLogs = Array.isArray(dbPrior) ? dbPrior.length > 0 : false
@@ -286,18 +292,20 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
     }
 
     const bodyText = hasPriorLogs
-      ? `This will delete today's log for ${exercise.name}. The exercise and its ${priorCount} previous session${priorCount !== 1 ? 's' : ''} will be kept.`
-      : `This will permanently remove ${exercise.name} from your library. It has no prior history.`
+      ? `This will delete today's ${workoutType} log for ${exercise.name}. The exercise and its ${priorCount} previous ${workoutType} session${priorCount !== 1 ? 's' : ''} will be kept.`
+      : isMultiTag
+        ? `This will delete today's ${workoutType} log for ${exercise.name}. The exercise will remain in other categories.`
+        : `This will permanently remove ${exercise.name} from your library. It has no prior history.`
 
-    setDeleteTarget({ exercise, hasPriorLogs, bodyText })
+    setDeleteTarget({ exercise, hasPriorLogs, isMultiTag, bodyText })
   }
 
   async function handleDelete() {
-    const { exercise, hasPriorLogs } = deleteTarget
+    const { exercise, hasPriorLogs, isMultiTag } = deleteTarget
     const today = todayStr()
 
-    if (!hasPriorLogs) {
-      // Explicitly delete logs first, then exercise (safe even if CASCADE is set)
+    if (!hasPriorLogs && !isMultiTag) {
+      // No prior logs AND only in this category: delete exercise entirely
       await supabase.from('exercise_logs').delete().eq('exercise_id', exercise.id)
       const { error } = await supabase.from('exercises').delete().eq('id', exercise.id)
       if (!error) {
@@ -308,8 +316,11 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
         showToast('Delete failed — check permissions')
       }
     } else {
+      // Has prior logs, or exists in other categories: only delete today's log for this workout type
       const { error } = await supabase.from('exercise_logs').delete()
-        .eq('exercise_id', exercise.id).eq('log_date', today)
+        .eq('exercise_id', exercise.id)
+        .eq('log_date', today)
+        .eq('workout_type', workoutType)
       if (!error) {
         setLogs(prev => ({
           ...prev,
@@ -323,40 +334,88 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
   }
 
   async function handleRemoveExerciseClick(exercise) {
-    const today = todayStr()
-    const localLogs = logs[exercise.id] || []
-    const localPrior = localLogs.filter(l => l.log_date < today)
+    const tags = exercise.workout_type_tags || []
+    const isMultiTag = tags.length > 1
 
-    let priorCount = localPrior.length
-
-    if (priorCount === 0) {
-      const { data: dbPrior } = await supabase
+    if (isMultiTag) {
+      // Case A: exercise lives in multiple categories — only remove from this one
+      const { data: thisTypeLogs } = await supabase
         .from('exercise_logs')
         .select('id')
         .eq('exercise_id', exercise.id)
-        .lt('log_date', today)
+        .eq('workout_type', workoutType)
 
-      priorCount = Array.isArray(dbPrior) ? dbPrior.length : 0
+      const sessionCount = thisTypeLogs?.length || 0
+      const otherCategories = tags.filter(t => t !== workoutType).join(' and ')
+      const bodyText = `This will remove ${exercise.name} from ${workoutType} and delete its ${sessionCount} ${workoutType} session${sessionCount !== 1 ? 's' : ''}. Its history in ${otherCategories} will not be affected.`
+
+      setRemoveExTarget({ exercise, bodyText, isMultiTag: true })
+    } else {
+      // Case B: exercise only exists in this category — full delete
+      const today = todayStr()
+      const localLogs = logs[exercise.id] || []
+      let priorCount = localLogs.filter(l => l.log_date < today).length
+
+      if (priorCount === 0) {
+        const { data: dbPrior } = await supabase
+          .from('exercise_logs')
+          .select('id')
+          .eq('exercise_id', exercise.id)
+          .lt('log_date', today)
+        priorCount = Array.isArray(dbPrior) ? dbPrior.length : 0
+      }
+
+      const bodyText = priorCount > 0
+        ? `This will permanently delete ${exercise.name} and all ${priorCount} logged session${priorCount !== 1 ? 's' : ''}. It only exists in ${workoutType} so removing it here deletes it completely.`
+        : `This will permanently remove ${exercise.name} from your library.`
+
+      setRemoveExTarget({ exercise, bodyText, isMultiTag: false })
     }
-
-    const bodyText = priorCount > 0
-      ? `This will permanently delete ${exercise.name} and all ${priorCount} logged session${priorCount !== 1 ? 's' : ''}. This cannot be undone.`
-      : `This will permanently remove ${exercise.name} from your library.`
-
-    setRemoveExTarget({ exercise, bodyText })
   }
 
   async function handleRemoveExercise() {
-    const { exercise } = removeExTarget
-    await supabase.from('exercise_logs').delete().eq('exercise_id', exercise.id)
-    const { error } = await supabase.from('exercises').delete().eq('id', exercise.id)
-    if (!error) {
-      setExercises(prev => prev.filter(e => e.id !== exercise.id))
-      setLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
-      showToast(`${exercise.name} removed`)
+    const { exercise, isMultiTag } = removeExTarget
+
+    if (isMultiTag) {
+      // Case A: delete only this category's logs and remove from tags
+      const { error: logErr } = await supabase
+        .from('exercise_logs')
+        .delete()
+        .eq('exercise_id', exercise.id)
+        .eq('workout_type', workoutType)
+
+      if (logErr) {
+        showToast('Delete failed — check permissions')
+        setRemoveExTarget(null)
+        return
+      }
+
+      const newTags = (exercise.workout_type_tags || []).filter(t => t !== workoutType)
+      const { error: tagErr } = await supabase
+        .from('exercises')
+        .update({ workout_type_tags: newTags })
+        .eq('id', exercise.id)
+
+      if (!tagErr) {
+        setExercises(prev => prev.filter(e => e.id !== exercise.id))
+        setLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
+        showToast(`${exercise.name} removed from ${workoutType}`)
+      } else {
+        showToast('Delete failed — check permissions')
+      }
     } else {
-      showToast('Delete failed — check permissions')
+      // Case B: delete exercise entirely
+      await supabase.from('exercise_logs').delete().eq('exercise_id', exercise.id)
+      const { error } = await supabase.from('exercises').delete().eq('id', exercise.id)
+      if (!error) {
+        setExercises(prev => prev.filter(e => e.id !== exercise.id))
+        setLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
+        showToast(`${exercise.name} removed`)
+      } else {
+        showToast('Delete failed — check permissions')
+      }
     }
+
     setRemoveExTarget(null)
   }
 
@@ -369,17 +428,22 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
       const todayLog = (logs[ex.id] || []).find(l => l.log_date === today)
       if (!todayLog) continue
 
+      // logs[] is filtered by workoutType, so priorLogs is per-category
       const priorLogs = (logs[ex.id] || []).filter(l => l.log_date < today)
+      const isMultiTag = (ex.workout_type_tags || []).length > 1
 
-      if (priorLogs.length === 0) {
-        // No prior history: remove from library entirely
+      if (priorLogs.length === 0 && !isMultiTag) {
+        // No prior history in this category AND only in this category: remove entirely
         await supabase.from('exercise_logs').delete().eq('exercise_id', ex.id)
         await supabase.from('exercises').delete().eq('id', ex.id)
         setExercises(prev => prev.filter(e => e.id !== ex.id))
         setLogs(prev => { const n = { ...prev }; delete n[ex.id]; return n })
       } else {
-        // Has prior history: only delete today's log
-        await supabase.from('exercise_logs').delete().eq('id', todayLog.id)
+        // Has prior history OR exists in other categories: only delete today's log for this type
+        await supabase.from('exercise_logs').delete()
+          .eq('exercise_id', ex.id)
+          .eq('log_date', today)
+          .eq('workout_type', workoutType)
         setLogs(prev => ({
           ...prev,
           [ex.id]: (prev[ex.id] || []).filter(l => l.log_date !== today),
@@ -538,6 +602,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
                   onDelete={() => handleDeleteClick(ex)}
                   onRemoveExercise={() => handleRemoveExerciseClick(ex)}
                   onAddTag={handleAddTag}
+                  workoutType={workoutType}
                 />
               ))
             )}
@@ -604,10 +669,10 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
 
       {removeExTarget && (
         <DeleteConfirmModal
-          title={`Remove ${removeExTarget.exercise.name}?`}
+          title={removeExTarget.isMultiTag ? `Remove from ${workoutType}?` : `Remove ${removeExTarget.exercise.name}?`}
           exercise={removeExTarget.exercise}
           bodyText={removeExTarget.bodyText}
-          confirmText="Remove permanently"
+          confirmText={removeExTarget.isMultiTag ? `Remove from ${workoutType}` : 'Remove permanently'}
           onConfirm={handleRemoveExercise}
           onCancel={() => setRemoveExTarget(null)}
         />

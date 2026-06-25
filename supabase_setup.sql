@@ -151,3 +151,25 @@ create policy "anon_all_habit_logs"    on habit_logs    for all to anon using (t
 create policy "anon_all_goals"         on goals         for all to anon using (true) with check (true);
 create policy "anon_all_exercises"     on exercises     for all to anon using (true) with check (true);
 create policy "anon_all_exercise_logs" on exercise_logs for all to anon using (true) with check (true);
+
+-- ============================================================
+-- Migration: category-scoped exercise logs
+-- Run these in order in the Supabase SQL editor ONCE
+-- ============================================================
+
+-- 1. Add workout_type column (idempotent)
+-- ALTER TABLE exercise_logs ADD COLUMN IF NOT EXISTS workout_type text NOT NULL DEFAULT '';
+
+-- 2. Backfill existing rows with the exercise's primary_workout_type
+-- UPDATE exercise_logs el
+-- SET workout_type = e.primary_workout_type
+-- FROM exercises e
+-- WHERE el.exercise_id = e.id;
+
+-- 3. Replace the old unique constraint with one that includes workout_type
+-- ALTER TABLE exercise_logs
+-- DROP CONSTRAINT IF EXISTS exercise_logs_exercise_id_log_date_key;
+
+-- ALTER TABLE exercise_logs
+-- ADD CONSTRAINT exercise_logs_exercise_id_log_date_workout_type_key
+-- UNIQUE (exercise_id, log_date, workout_type);
