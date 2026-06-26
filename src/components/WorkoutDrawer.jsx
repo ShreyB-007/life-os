@@ -14,6 +14,7 @@ const WORKOUT_EMOJIS = { Push: '💪', Pull: '🏋️', Legs: '🦵', Cardio: '�
 export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose, onDone, onDeleteSession, onFirstExerciseLogged, onTransferComplete }) {
   const [exercises, setExercises]             = useState([])
   const [logs, setLogs]                       = useState({})
+  const [allLogs, setAllLogs]                 = useState({})
   const [loading, setLoading]                 = useState(true)
   const [expandedId, setExpandedId]           = useState(null)
   const [showAdd, setShowAdd]                 = useState(false)
@@ -105,8 +106,19 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
       for (const ex of exs) map[ex.id] = []
       for (const l of (logData || [])) map[l.exercise_id].push(l)
       setLogs(map)
+
+      const { data: allLogData } = await supabase
+        .from('exercise_logs')
+        .select('*')
+        .in('exercise_id', ids)
+        .order('log_date', { ascending: false })
+      const allMap = {}
+      for (const ex of exs) allMap[ex.id] = []
+      for (const l of (allLogData || [])) allMap[l.exercise_id].push(l)
+      setAllLogs(allMap)
     } else {
       setLogs({})
+      setAllLogs({})
     }
     setLoading(false)
   }
@@ -239,6 +251,10 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
       ...prev,
       [exerciseId]: [entry, ...(prev[exerciseId] || []).filter(l => l.log_date !== entry.log_date)],
     }))
+    setAllLogs(prev => ({
+      ...prev,
+      [exerciseId]: [entry, ...(prev[exerciseId] || []).filter(l => !(l.log_date === entry.log_date && l.workout_type === entry.workout_type))],
+    }))
     if (!alreadyHadTodaySession && entry.log_date === getLocalDate()) {
       onFirstExerciseLogged?.(workoutType)
     }
@@ -268,6 +284,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
 
     setExercises(prev => [...prev, data])
     setLogs(prev => ({ ...prev, [data.id]: [] }))
+    setAllLogs(prev => ({ ...prev, [data.id]: [] }))
     setExpandedId(data.id)
     return null
   }
@@ -290,15 +307,21 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
         await supabase.from('exercises').delete().eq('id', exercise.id)
         setExercises(prev => prev.filter(e => e.id !== exercise.id))
         setLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
+        setAllLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
       } else {
         // Also in other categories: remove this category's tag, hide from this drawer
         const newTags = tags.filter(t => t !== workoutType)
         await supabase.from('exercises').update({ workout_type_tags: newTags }).eq('id', exercise.id)
         setExercises(prev => prev.filter(e => e.id !== exercise.id))
         setLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
+        setAllLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
       }
     } else {
       setLogs(prev => ({ ...prev, [exercise.id]: updatedLogs }))
+      setAllLogs(prev => ({
+        ...prev,
+        [exercise.id]: (prev[exercise.id] || []).filter(l => !(l.log_date === today && l.workout_type === workoutType)),
+      }))
     }
   }
 
@@ -368,6 +391,10 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
       if (!tagErr) {
         setExercises(prev => prev.filter(e => e.id !== exercise.id))
         setLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
+        setAllLogs(prev => ({
+          ...prev,
+          [exercise.id]: (prev[exercise.id] || []).filter(l => l.workout_type !== workoutType),
+        }))
         showToast(`${exercise.name} removed from ${workoutType}`)
       } else {
         showToast('Delete failed — check permissions')
@@ -379,6 +406,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
       if (!error) {
         setExercises(prev => prev.filter(e => e.id !== exercise.id))
         setLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
+        setAllLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
         showToast(`${exercise.name} removed`)
       } else {
         showToast('Delete failed — check permissions')
@@ -407,6 +435,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
         await supabase.from('exercises').delete().eq('id', ex.id)
         setExercises(prev => prev.filter(e => e.id !== ex.id))
         setLogs(prev => { const n = { ...prev }; delete n[ex.id]; return n })
+        setAllLogs(prev => { const n = { ...prev }; delete n[ex.id]; return n })
       } else {
         // Has prior history OR exists in other categories: only delete today's log for this type
         await supabase.from('exercise_logs').delete()
@@ -416,6 +445,10 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
         setLogs(prev => ({
           ...prev,
           [ex.id]: (prev[ex.id] || []).filter(l => l.log_date !== today),
+        }))
+        setAllLogs(prev => ({
+          ...prev,
+          [ex.id]: (prev[ex.id] || []).filter(l => !(l.log_date === today && l.workout_type === workoutType)),
         }))
       }
     }
@@ -563,6 +596,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
                   key={ex.id}
                   exercise={ex}
                   logs={logs[ex.id] || []}
+                  allLogs={allLogs[ex.id] || []}
                   expanded={expandedId === ex.id}
                   onToggle={() => setExpandedId(prev => prev === ex.id ? null : ex.id)}
                   onCollapse={() => setExpandedId(prev => prev === ex.id ? null : prev)}
@@ -621,7 +655,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
       {graphExercise && (
         <ProgressGraph
           exercise={graphExercise}
-          logs={logs[graphExercise.id] || []}
+          logs={allLogs[graphExercise.id] || []}
           onClose={() => setGraphExercise(null)}
         />
       )}

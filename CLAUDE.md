@@ -277,4 +277,5 @@ Report: qa_reports/[filename]
 - 2026-06-25: Category-scoped exercise deletion (workout_type column, scoped delete/remove, history grouping, transfer) — 8/8 passed
 - 2026-06-26: Transfer deduplication fix (reuse global exercise row, never insert) — 6/6 passed
 - 2026-06-26: Transfer orphan cleanup — live browser investigation confirmed zero exercise inserts; purgeOrphanDuplicates heals existing DB damage — 4/4 passed
+- 2026-06-26: Global graph + days-since (allLogs state, cross-category graph data, category tooltip label) — 8/8 passed
 

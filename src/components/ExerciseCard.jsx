@@ -176,8 +176,8 @@ function getDaysStyle(days) {
 }
 
 export default function ExerciseCard({
-  exercise, logs, expanded, onToggle, onCollapse,
-  onLogSave, onOpenGraph, onDelete, onRemoveExercise, onAddTag,
+  exercise, logs, allLogs = [], expanded, onToggle, onCollapse,
+  onLogSave, onOpenGraph, onDeleteToday, onRemoveExercise, onAddTag,
   workoutType,
 }) {
   const today = todayStr()
@@ -185,7 +185,7 @@ export default function ExerciseCard({
 
   const todayLog   = logs.find(l => l.log_date === today) ?? null
   const lastLog    = logs.find(l => l.log_date !== today) ?? null
-  const mostRecent = logs[0] ?? null
+  const mostRecent = (allLogs.length > 0 ? allLogs : logs)[0] ?? null
 
   const [sets, setSets]                       = useState(() => setsFromLog(todayLog, wt))
   const [saved, setSaved]                     = useState(!!todayLog)
@@ -271,7 +271,7 @@ export default function ExerciseCard({
 
   const d30 = new Date(); d30.setDate(d30.getDate() - 30)
   const d30str = getLocalDateString(d30)
-  const last30Count = logs.filter(l => l.log_date >= d30str).length
+  const last30Count = (allLogs.length > 0 ? allLogs : logs).filter(l => l.log_date >= d30str).length
   const showStreakBadge = last30Count >= 7
 
   // ── Form state ────────────────────────────────────────────────────────────
@@ -542,7 +542,7 @@ export default function ExerciseCard({
           View graph
         </button>
         {todayLog && (
-          <button onClick={() => onDelete()} className="action-pill-btn action-pill-red">
+          <button onClick={() => onDeleteToday()} className="action-pill-btn action-pill-red">
             <i className="ti ti-trash" />
             Delete today
           </button>

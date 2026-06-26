@@ -24,7 +24,7 @@ function GoalRow({ goal, index }) {
   useEffect(() => {
     const t = setTimeout(() => setShineMounted(true), 50 + index * 100)
     return () => clearTimeout(t)
-  }, [])
+  }, [index])
 
   return (
     <div className="habit-card card-interactive flex items-center gap-3 rounded-xl px-4 py-3">

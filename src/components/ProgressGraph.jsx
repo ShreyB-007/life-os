@@ -501,13 +501,17 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
 
                           {/* Individual tooltip for single-series mode */}
                           {!compareMode && isHov && (() => {
-                            const tipX = Math.min(Math.max(cx, PAD.left + 60), W - PAD.right - 60)
-                            const tipY = cy - 36
+                            const tipX = Math.min(Math.max(cx, PAD.left + 80), W - PAD.right - 80)
+                            const tipY = cy - 46
+                            const catLabel = session.workout_type ? ` (${session.workout_type})` : ''
                             return (
                               <g pointerEvents="none">
-                                <rect x={tipX - 60} y={tipY} width="120" height="22" rx="4" fill="#0F0F1A" stroke="#1C1C2E" />
-                                <text x={tipX} y={tipY + 14} textAnchor="middle" fontSize="10" fill="#E8E8F0" className="font-mono">
-                                  {session.log_date.slice(5)} · {isPR ? '🏆 ' : ''}{formatTooltipValue(val, key, session, wt)}
+                                <rect x={tipX - 80} y={tipY} width="160" height="36" rx="4" fill="#0F0F1A" stroke="#1C1C2E" />
+                                <text x={tipX} y={tipY + 13} textAnchor="middle" fontSize="9" fill="#8080A0" className="font-mono">
+                                  {session.log_date.slice(5)}{catLabel}
+                                </text>
+                                <text x={tipX} y={tipY + 27} textAnchor="middle" fontSize="10" fill="#E8E8F0" className="font-mono">
+                                  {isPR ? '🏆 ' : ''}{formatTooltipValue(val, key, session, wt)}
                                 </text>
                               </g>
                             )
@@ -557,7 +561,7 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
                       rx="4" fill="#0F0F1A" fillOpacity="0.96" stroke="#2D2D4A" />
                     <text x={tipX} y={tipY + LINE_H}
                       textAnchor="middle" fontSize="9" fill="#8080A0" className="font-mono">
-                      {session.log_date.slice(5)}
+                      {session.log_date.slice(5)}{session.workout_type ? ` (${session.workout_type})` : ''}
                     </text>
                     {entries.map((e, di) => {
                       const lineY = tipY + LINE_H + PAD_V / 2 + di * LINE_H + LINE_H - 1

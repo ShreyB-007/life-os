@@ -57,10 +57,9 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, allLogs = [], on
 
     onLog('dsa', logEntry)
 
-    const { error } = await supabase
+    await supabase
       .from('habit_logs')
       .upsert(logEntry, { onConflict: 'habit_key,log_date' })
-    if (error) console.error('DSA save failed:', error)
   }
 
   function adjust(key, delta) {
