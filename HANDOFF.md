@@ -1,12 +1,15 @@
 # Life OS — Handoff Log
 
 ## Meta
-Last updated: 2026-06-26T00:00:00+05:30
+Last updated: 2026-06-26T11:30:00+05:30
 Last updated by: Claude Code
 Current phase: Phase 2 — Gym Workout Tracker
 
 ## Just Completed (this session)
-- Fixed transfer duplicating exercise rows: `handleTransfer` now reuses the global exercise row (same `exercise_id`) instead of creating a new one. "Adding to a category" is done by updating `workout_type_tags`, never inserting. Removed stale `transferNormalizedName` helper.
+- Browser investigation of the transfer duplication bug using Playwright + network interceptor.
+- Confirmed: current handleTransfer code produces ZERO exercise table inserts. The visible duplicates were orphan rows left by the old (pre-fix) transfer code.
+- Added `purgeOrphanDuplicates(exs)` to WorkoutDrawer.fetchData: on every drawer open, exercises with the same name in the category where some have zero total logs are auto-deleted (safe, CASCADE). This heals existing DB damage silently.
+- Verified end-to-end: transfer of multi-tag exercise (Legs→Cardio) shows zero inserts on exercises table, one clean entry in target drawer after transfer.
 
 ## In Progress (incomplete — pick up here first)
 None — see Queued Next.
@@ -18,7 +21,7 @@ None — see Queued Next.
 
 ## Phase Completion Status
 -> Phase 1 (Dashboard + Habits): ✅ Complete
--> Phase 2 (Gym Workout Tracker): ✅ Feature-complete — transfer dedup fix shipped
+-> Phase 2 (Gym Workout Tracker): ✅ Feature-complete — transfer dedup + orphan cleanup shipped
 -> Phase 3 (Goals Page + Masters Research Agent): ⏳ Not started — stubs exist at src/pages/Goals.jsx and src/pages/Masters.jsx
 -> Phase 4 (News Feeds — Gemini): ⏳ Not started
 -> Phase 5 (Weekly Review + Polish): ⏳ Not started
@@ -33,7 +36,8 @@ None — see Queued Next.
 - exercise_logs scoped by workout_type: each drawer only sees its own category's sessions.
 - "Remove from [WorkoutType]" (Case A): removes tag + deletes only that category's logs; exercise survives in other categories.
 - "Remove from [WorkoutType]" (Case B): single-tag exercise → deletes entirely.
-- Transfer: moves today's source logs into the target type using the SAME exercise_id (no duplicate rows). Tags updated in-place. After delete, step 5 removes the source tag if no remaining logs use it.
+- Transfer: moves today's source logs into the target type using the SAME exercise_id (no duplicate rows ever created). Tags updated in-place. Source tag removed if no remaining logs use it.
+- purgeOrphanDuplicates: on every fetchData, same-name zero-log orphan exercises in the category are auto-deleted. Heals DB damage from old code.
 - HistoryDrawer groups sessions by workout_type sub-headers for multi-tag exercises.
 - DSA counters save immediately and restore from today's `habit_logs.payload` on reload.
 - NeuralConstellation cursor attraction remains active while node repulsion prevents pile-ups.
@@ -48,7 +52,7 @@ None — see Queued Next.
 - All exercise_logs upserts must include `workout_type` and use the new three-column onConflict.
 - Category-scoped delete: multi-tag removes only the current category's logs and tag; single-tag deletes everything.
 - Transfer uses the source exercise's id directly — never inserts a new exercise row. Tags updated via array update.
-- Step 5 cleanup re-fetches current tags from DB before removing the source tag (avoids stale-state after Step 2 modification).
+- purgeOrphanDuplicates uses count=0 across ALL dates and types as the safe-delete criterion (not just current category count). Exercises with any logs in any category are never auto-deleted.
 - DSA saves immediately on every counter adjustment; no debounce is currently used.
 - Card surfaces use CSS classes (`habit-card`, `habit-card-done`, `drawer-card-bg`) instead of Tailwind dark surface classes.
 - Every session ends with `git push origin main` to trigger Vercel auto-deploy.
@@ -57,13 +61,13 @@ None — see Queued Next.
 - DB migration must be run manually in Supabase SQL editor before the workout_type feature works. Migration SQL is in supabase_setup.sql (commented out statements at the bottom).
 
 ## Files Changed This Session
-- `src/components/WorkoutDrawer.jsx` — `handleTransfer` rewritten; `transferNormalizedName` helper removed.
-- `qa_reports/qa_20260626_transfer_fix.md` — QA report (6/6 passed).
-- `qa_reports/code_quality_20260626.md` — code quality report.
+- `src/components/WorkoutDrawer.jsx` — added `purgeOrphanDuplicates(exs)` function; refactored `fetchData` to call it after the initial exercises query.
+- `qa_reports/qa_20260626_transfer_dedup_browser.md` — browser investigation QA report (4/4 passed).
+- `qa_reports/code_quality_20260626b.md` — code quality report.
 - `CLAUDE.md` — QA History entry appended.
 - `HANDOFF.md` — refreshed.
 
 ## QA Status
-Last QA run: 2026-06-26T00:00:00+05:30
-Pass rate: 6/6 passed
-Report: qa_reports/qa_20260626_transfer_fix.md
+Last QA run: 2026-06-26T11:30:00+05:30
+Pass rate: 4/4 passed (browser-verified)
+Report: qa_reports/qa_20260626_transfer_dedup_browser.md

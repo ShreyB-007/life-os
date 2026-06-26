@@ -51,15 +51,45 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
     return () => { document.body.style.overflow = '' }
   }, [])
 
+  // Detects exercises with the same name in this category where some have zero total
+  // logs across all dates — these are orphan rows left by a previous buggy transfer
+  // path. Safe to delete (CASCADE removes their empty log records too).
+  async function purgeOrphanDuplicates(exs) {
+    const byName = new Map()
+    for (const ex of exs) {
+      const key = ex.name.toLowerCase().trim()
+      if (!byName.has(key)) byName.set(key, [])
+      byName.get(key).push(ex)
+    }
+
+    const toDelete = []
+    for (const group of byName.values()) {
+      if (group.length <= 1) continue
+      for (const ex of group) {
+        const { count } = await supabase
+          .from('exercise_logs')
+          .select('id', { count: 'exact', head: true })
+          .eq('exercise_id', ex.id)
+        if (count === 0) toDelete.push(ex.id)
+      }
+    }
+
+    if (toDelete.length === 0) return exs
+    await supabase.from('exercises').delete().in('id', toDelete)
+    return exs.filter(e => !toDelete.includes(e.id))
+  }
+
   async function fetchData() {
     setLoading(true)
-    const { data: exs } = await supabase
+    const { data: rawExs } = await supabase
       .from('exercises')
       .select('*')
       .contains('workout_type_tags', [workoutType])
       .order('created_at')
 
-    if (!exs) { setLoading(false); return }
+    if (!rawExs) { setLoading(false); return }
+
+    const exs = await purgeOrphanDuplicates(rawExs)
     setExercises(exs)
 
     const ids = exs.map(e => e.id)
