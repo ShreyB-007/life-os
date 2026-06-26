@@ -1,21 +1,15 @@
 # Life OS — Handoff Log
 
 ## Meta
-Last updated: 2026-06-25T13:35:00+05:30
+Last updated: 2026-06-26T00:00:00+05:30
 Last updated by: Claude Code
 Current phase: Phase 2 — Gym Workout Tracker
 
 ## Just Completed (this session)
-- Added `workout_type` column to exercise_logs (migration SQL documented in supabase_setup.sql).
-- Updated all exercise_logs upserts to include `workout_type` and use `onConflict: 'exercise_id,log_date,workout_type'`.
-- WorkoutDrawer fetchData now filters logs by `workout_type = currentDrawerWorkoutType` so each drawer only sees its own logs.
-- Category-scoped "Remove from [WorkoutType]" button (Case A: multi-tag removes tag+logs for that type only; Case B: single-tag deletes exercise entirely).
-- "Delete today" and "Delete today's session" both scoped to current workout_type; multi-tag exercises are never fully deleted via today-delete.
-- Transfer: source logs fetched/deleted with `workout_type = fromType`; target upserted with `workout_type = targetType`.
-- HistoryDrawer: grouped session display for multi-tag exercises (sub-headers "🦵 Legs Day", "🏃 Cardio Day", etc.); InlineSessionEditor upsert updated to include workout_type.
+- Fixed transfer duplicating exercise rows: `handleTransfer` now reuses the global exercise row (same `exercise_id`) instead of creating a new one. "Adding to a category" is done by updating `workout_type_tags`, never inserting. Removed stale `transferNormalizedName` helper.
 
 ## In Progress (incomplete — pick up here first)
-IMPORTANT — DB migration must be run before this build is usable: open Supabase SQL editor and run the four migration statements documented at the bottom of supabase_setup.sql.
+None — see Queued Next.
 
 ## Queued Next (in priority order)
 1. Phase 3 kickoff — Goals page: build out the Goals page (`src/pages/Goals.jsx` is currently a stub). The goals table exists in Supabase (`supabase_setup.sql`). Implement goal creation, progress tracking, and display using the existing GoalsSection component as a starting point (`src/components/GoalsSection.jsx`).
@@ -24,7 +18,7 @@ IMPORTANT — DB migration must be run before this build is usable: open Supabas
 
 ## Phase Completion Status
 -> Phase 1 (Dashboard + Habits): ✅ Complete
--> Phase 2 (Gym Workout Tracker): ✅ Feature-complete — category-scoped delete + workout_type tracking shipped
+-> Phase 2 (Gym Workout Tracker): ✅ Feature-complete — transfer dedup fix shipped
 -> Phase 3 (Goals Page + Masters Research Agent): ⏳ Not started — stubs exist at src/pages/Goals.jsx and src/pages/Masters.jsx
 -> Phase 4 (News Feeds — Gemini): ⏳ Not started
 -> Phase 5 (Weekly Review + Polish): ⏳ Not started
@@ -39,7 +33,7 @@ IMPORTANT — DB migration must be run before this build is usable: open Supabas
 - exercise_logs scoped by workout_type: each drawer only sees its own category's sessions.
 - "Remove from [WorkoutType]" (Case A): removes tag + deletes only that category's logs; exercise survives in other categories.
 - "Remove from [WorkoutType]" (Case B): single-tag exercise → deletes entirely.
-- Transfer moves today's source logs into the target type (workout_type = targetType) and deletes source logs (workout_type = sourceType).
+- Transfer: moves today's source logs into the target type using the SAME exercise_id (no duplicate rows). Tags updated in-place. After delete, step 5 removes the source tag if no remaining logs use it.
 - HistoryDrawer groups sessions by workout_type sub-headers for multi-tag exercises.
 - DSA counters save immediately and restore from today's `habit_logs.payload` on reload.
 - NeuralConstellation cursor attraction remains active while node repulsion prevents pile-ups.
@@ -50,10 +44,11 @@ IMPORTANT — DB migration must be run before this build is usable: open Supabas
 - `getLocalDate()` / `todayStr()` local-date utilities are required for all app date comparisons; do not use UTC date slicing.
 - Gym workout type selection is not a completed gym habit until at least one exercise set is saved.
 - Rest day is the only gym path that can immediately satisfy gym without exercise logs.
-- exercise_logs unique constraint is now `(exercise_id, log_date, workout_type)` — NOT `(exercise_id, log_date)`.
+- exercise_logs unique constraint is `(exercise_id, log_date, workout_type)` — three-column conflict key.
 - All exercise_logs upserts must include `workout_type` and use the new three-column onConflict.
 - Category-scoped delete: multi-tag removes only the current category's logs and tag; single-tag deletes everything.
-- Transfer uses `workout_type = fromType` filter on source delete and `workout_type = targetType` on upsert.
+- Transfer uses the source exercise's id directly — never inserts a new exercise row. Tags updated via array update.
+- Step 5 cleanup re-fetches current tags from DB before removing the source tag (avoids stale-state after Step 2 modification).
 - DSA saves immediately on every counter adjustment; no debounce is currently used.
 - Card surfaces use CSS classes (`habit-card`, `habit-card-done`, `drawer-card-bg`) instead of Tailwind dark surface classes.
 - Every session ends with `git push origin main` to trigger Vercel auto-deploy.
@@ -62,16 +57,13 @@ IMPORTANT — DB migration must be run before this build is usable: open Supabas
 - DB migration must be run manually in Supabase SQL editor before the workout_type feature works. Migration SQL is in supabase_setup.sql (commented out statements at the bottom).
 
 ## Files Changed This Session
-- `supabase_setup.sql` — migration SQL documented (commented) at bottom for manual run.
-- `src/components/ExerciseCard.jsx` — accept `workoutType` prop; include in upsert entry + onConflict; "Remove from [WorkoutType]" button text + icon.
-- `src/components/WorkoutDrawer.jsx` — fetchData filters logs by workout_type; checkForTransfer + handleTransfer scoped; handleDeleteClick/handleDelete multi-tag aware; handleRemoveExerciseClick/handleRemoveExercise Case A/B; handleDeleteTodaySession scoped; ExerciseCard receives workoutType prop; removeExTarget modal uses dynamic title/confirmText.
-- `src/components/HistoryDrawer.jsx` — WORKOUT_EMOJIS constant; isMultiTag detection; grouped session display in HistoryExerciseCard; InlineSessionEditor.handleSave includes workout_type + new onConflict.
-- `qa_reports/qa_20260625_category_scoped_delete.md` — QA report.
-- `qa_reports/code_quality_20260625.md` — code quality report.
+- `src/components/WorkoutDrawer.jsx` — `handleTransfer` rewritten; `transferNormalizedName` helper removed.
+- `qa_reports/qa_20260626_transfer_fix.md` — QA report (6/6 passed).
+- `qa_reports/code_quality_20260626.md` — code quality report.
 - `CLAUDE.md` — QA History entry appended.
 - `HANDOFF.md` — refreshed.
 
 ## QA Status
-Last QA run: 2026-06-25T13:35:00+05:30
-Pass rate: 8/8 passed
-Report: qa_reports/qa_20260625_category_scoped_delete.md
+Last QA run: 2026-06-26T00:00:00+05:30
+Pass rate: 6/6 passed
+Report: qa_reports/qa_20260626_transfer_fix.md

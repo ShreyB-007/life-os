@@ -10,9 +10,6 @@ import ProgressGraph from './ProgressGraph'
 
 const WORKOUT_EMOJIS = { Push: '💪', Pull: '🏋️', Legs: '🦵', Cardio: '🏃' }
 
-function transferNormalizedName(normalizedName, workoutType) {
-  return `${normalizedName}__${workoutType.toLowerCase()}`
-}
 
 export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose, onDone, onDeleteSession, onFirstExerciseLogged, onTransferComplete }) {
   const [exercises, setExercises]             = useState([])
@@ -21,7 +18,6 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
   const [expandedId, setExpandedId]           = useState(null)
   const [showAdd, setShowAdd]                 = useState(false)
   const [graphExercise, setGraphExercise]     = useState(null)
-  const [deleteTarget, setDeleteTarget]       = useState(null)
   const [removeExTarget, setRemoveExTarget]   = useState(null)
   const [toast, setToast]                     = useState(null)
   const [showTransferBanner, setShowTransferBanner] = useState(false)
@@ -108,105 +104,83 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
     const today = getLocalDate()
 
     try {
-      // Step 1: fetch today's exercise_logs for fromType.
-      const { data: fromExs } = await supabase
-        .from('exercises')
-        .select('id, name, normalized_name, workout_type_tags, primary_workout_type, weight_type')
-        .contains('workout_type_tags', [fromType])
-
-      if (!fromExs?.length) { setShowTransferBanner(false); return }
-
-      const sourceExerciseIds = fromExs.map(e => e.id)
-      const { data: fromLogs } = await supabase
+      // Step 1: fetch today's exercise_logs for fromType, joining exercise data.
+      const { data: sourceLogs, error: fetchErr } = await supabase
         .from('exercise_logs')
-        .select('*')
-        .in('exercise_id', sourceExerciseIds)
+        .select('*, exercises(*)')
         .eq('log_date', today)
         .eq('workout_type', fromType)
 
-      if (!fromLogs?.length) { setShowTransferBanner(false); return }
+      if (fetchErr) throw fetchErr
+      if (!sourceLogs?.length) { setShowTransferBanner(false); return }
 
-      // Step 2: for each log, upsert into toType, creating a target exercise if needed.
-      for (const log of fromLogs) {
-        const srcEx = fromExs.find(e => e.id === log.exercise_id)
-        if (!srcEx) continue
+      // Steps 2 + 3: tag the exercise in toType (never create a new row) and upsert the log.
+      for (const log of sourceLogs) {
+        const exercise = log.exercises
+        if (!exercise) continue
 
-        const alias = transferNormalizedName(srcEx.normalized_name, workoutType)
-        const { data: targetMatches } = await supabase
-          .from('exercises')
-          .select('id, workout_type_tags')
-          .in('normalized_name', [srcEx.normalized_name, alias])
-
-        let targetEx = targetMatches?.find(ex =>
-          ex.id !== srcEx.id && (ex.workout_type_tags || []).includes(workoutType)
-        )
-
-        if (!targetEx) {
-          const existingAlias = targetMatches?.find(ex => ex.id !== srcEx.id)
-          if (existingAlias) {
-            const nextTags = [...new Set([...(existingAlias.workout_type_tags || []), workoutType])]
-            const { data: updated, error: updateErr } = await supabase
-              .from('exercises')
-              .update({ workout_type_tags: nextTags, primary_workout_type: workoutType })
-              .eq('id', existingAlias.id)
-              .select('id')
-              .single()
-            if (updateErr) throw updateErr
-            targetEx = updated
-          } else {
-            const { data: created, error: createErr } = await supabase
-              .from('exercises')
-              .insert({
-                name: srcEx.name,
-                normalized_name: alias,
-                weight_type: srcEx.weight_type,
-                primary_workout_type: workoutType,
-                workout_type_tags: [workoutType],
-              })
-              .select('id')
-              .single()
-            if (createErr) throw createErr
-            targetEx = created
-          }
+        if (!(exercise.workout_type_tags || []).includes(workoutType)) {
+          const { error: tagErr } = await supabase
+            .from('exercises')
+            .update({ workout_type_tags: [...(exercise.workout_type_tags || []), workoutType] })
+            .eq('id', exercise.id)
+          if (tagErr) throw tagErr
         }
 
-        const { error: upsertErr } = await supabase.from('exercise_logs').upsert({
-          exercise_id: targetEx.id,
-          log_date: log.log_date,
-          sets: log.sets,
-          logged_at: log.logged_at,
-          workout_type: workoutType,
-        }, { onConflict: 'exercise_id,log_date,workout_type' })
+        const { error: upsertErr } = await supabase
+          .from('exercise_logs')
+          .upsert({
+            exercise_id: exercise.id,
+            log_date: today,
+            workout_type: workoutType,
+            sets: log.sets,
+            is_pr: log.is_pr,
+          }, { onConflict: 'exercise_id,log_date,workout_type' })
         if (upsertErr) throw upsertErr
       }
 
-      // Step 3: explicitly delete all of today's logs from source exercises (source type only).
+      // Step 4: delete source logs after all upserts succeed.
+      const sourceExerciseIds = sourceLogs.map(l => l.exercise_id)
       const { error: deleteErr } = await supabase
         .from('exercise_logs')
         .delete()
         .in('exercise_id', sourceExerciseIds)
-        .eq('log_date', getLocalDate())
+        .eq('log_date', today)
         .eq('workout_type', fromType)
+
       if (deleteErr) {
-        console.error('Transfer source delete failed:', deleteErr)
-        showToast('Transfer failed - source logs were not deleted')
+        showToast('Transfer failed — source logs were not deleted')
         return
       }
 
-      // Step 4: no-prior-history cleanup on fromType exercises.
-      for (const srcEx of fromExs) {
-        const { data: remainingLogs } = await supabase
-          .from('exercise_logs')
-          .select('id')
-          .eq('exercise_id', srcEx.id)
-          .limit(1)
+      // Step 5: remove fromType tag if the exercise has no more logs in fromType across any date.
+      for (const log of sourceLogs) {
+        const exercise = log.exercises
+        if (!exercise) continue
 
-        if (!remainingLogs?.length) {
-          await supabase.from('exercises').delete().eq('id', srcEx.id)
+        const { count } = await supabase
+          .from('exercise_logs')
+          .select('id', { count: 'exact', head: true })
+          .eq('exercise_id', exercise.id)
+          .eq('workout_type', fromType)
+
+        if (count === 0) {
+          const { data: freshEx } = await supabase
+            .from('exercises')
+            .select('workout_type_tags')
+            .eq('id', exercise.id)
+            .single()
+
+          if (freshEx) {
+            await supabase
+              .from('exercises')
+              .update({ workout_type_tags: freshEx.workout_type_tags.filter(t => t !== fromType) })
+              .eq('id', exercise.id)
+          }
         }
       }
 
-      // Step 5: update habit_logs payload to toType.
+      // Step 6: update habit_logs payload to toType and refresh local state.
       await supabase.from('habit_logs').upsert({
         habit_key: 'gym',
         log_date: today,
@@ -216,14 +190,13 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
         logged_at: new Date().toISOString(),
       }, { onConflict: 'habit_key,log_date' })
 
-      // Step 6: update local state optimistically.
       setShowTransferBanner(false)
       await fetchData()
       showToast(`Session transferred from ${fromType}`)
       onTransferComplete?.(workoutType)
 
     } catch {
-      showToast('Transfer failed - please try again')
+      showToast('Transfer failed — please try again')
     } finally {
       setTransferring(false)
     }
@@ -269,68 +242,34 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
     return null
   }
 
-  async function handleDeleteClick(exercise) {
+  async function handleDeleteToday(exercise) {
     const today = todayStr()
-    const isMultiTag = (exercise.workout_type_tags || []).length > 1
-    // logs[] is already filtered by workoutType (from fetchData), so prior count is per-category
-    const localLogs = logs[exercise.id] || []
-    const localPrior = localLogs.filter(l => l.log_date < today)
+    const updatedLogs = (logs[exercise.id] || []).filter(l => l.log_date !== today)
 
-    let hasPriorLogs = localPrior.length > 0
-    let priorCount   = localPrior.length
+    // Delete today's log for this exercise in this category only
+    await supabase.from('exercise_logs').delete()
+      .eq('exercise_id', exercise.id)
+      .eq('log_date', today)
+      .eq('workout_type', workoutType)
 
-    if (!hasPriorLogs) {
-      const { data: dbPrior } = await supabase
-        .from('exercise_logs')
-        .select('id')
-        .eq('exercise_id', exercise.id)
-        .eq('workout_type', workoutType)
-        .lt('log_date', today)
-
-      hasPriorLogs = Array.isArray(dbPrior) ? dbPrior.length > 0 : false
-      priorCount   = Array.isArray(dbPrior) ? dbPrior.length : 0
-    }
-
-    const bodyText = hasPriorLogs
-      ? `This will delete today's ${workoutType} log for ${exercise.name}. The exercise and its ${priorCount} previous ${workoutType} session${priorCount !== 1 ? 's' : ''} will be kept.`
-      : isMultiTag
-        ? `This will delete today's ${workoutType} log for ${exercise.name}. The exercise will remain in other categories.`
-        : `This will permanently remove ${exercise.name} from your library. It has no prior history.`
-
-    setDeleteTarget({ exercise, hasPriorLogs, isMultiTag, bodyText })
-  }
-
-  async function handleDelete() {
-    const { exercise, hasPriorLogs, isMultiTag } = deleteTarget
-    const today = todayStr()
-
-    if (!hasPriorLogs && !isMultiTag) {
-      // No prior logs AND only in this category: delete exercise entirely
-      await supabase.from('exercise_logs').delete().eq('exercise_id', exercise.id)
-      const { error } = await supabase.from('exercises').delete().eq('id', exercise.id)
-      if (!error) {
+    if (updatedLogs.length === 0) {
+      // No logs remain for this exercise in this category — clean up
+      const tags = exercise.workout_type_tags || []
+      if (tags.length <= 1) {
+        // Only in this category: delete exercise entirely
+        await supabase.from('exercises').delete().eq('id', exercise.id)
         setExercises(prev => prev.filter(e => e.id !== exercise.id))
         setLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
-        showToast(`${exercise.name} removed from library`)
       } else {
-        showToast('Delete failed — check permissions')
+        // Also in other categories: remove this category's tag, hide from this drawer
+        const newTags = tags.filter(t => t !== workoutType)
+        await supabase.from('exercises').update({ workout_type_tags: newTags }).eq('id', exercise.id)
+        setExercises(prev => prev.filter(e => e.id !== exercise.id))
+        setLogs(prev => { const n = { ...prev }; delete n[exercise.id]; return n })
       }
     } else {
-      // Has prior logs, or exists in other categories: only delete today's log for this workout type
-      const { error } = await supabase.from('exercise_logs').delete()
-        .eq('exercise_id', exercise.id)
-        .eq('log_date', today)
-        .eq('workout_type', workoutType)
-      if (!error) {
-        setLogs(prev => ({
-          ...prev,
-          [exercise.id]: (prev[exercise.id] || []).filter(l => l.log_date !== today),
-        }))
-        showToast(`Today's ${exercise.name} log removed`)
-      }
+      setLogs(prev => ({ ...prev, [exercise.id]: updatedLogs }))
     }
-
-    setDeleteTarget(null)
   }
 
   async function handleRemoveExerciseClick(exercise) {
@@ -599,7 +538,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
                   onCollapse={() => setExpandedId(prev => prev === ex.id ? null : prev)}
                   onLogSave={entry => handleLogSave(ex.id, entry)}
                   onOpenGraph={() => setGraphExercise(ex)}
-                  onDelete={() => handleDeleteClick(ex)}
+                  onDeleteToday={() => handleDeleteToday(ex)}
                   onRemoveExercise={() => handleRemoveExerciseClick(ex)}
                   onAddTag={handleAddTag}
                   workoutType={workoutType}
@@ -654,16 +593,6 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
           exercise={graphExercise}
           logs={logs[graphExercise.id] || []}
           onClose={() => setGraphExercise(null)}
-        />
-      )}
-
-      {deleteTarget && (
-        <DeleteConfirmModal
-          exercise={deleteTarget.exercise}
-          bodyText={deleteTarget.bodyText}
-          confirmText={deleteTarget.hasPriorLogs ? "Delete today's log" : 'Delete permanently'}
-          onConfirm={handleDelete}
-          onCancel={() => setDeleteTarget(null)}
         />
       )}
 
