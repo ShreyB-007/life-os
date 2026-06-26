@@ -547,10 +547,12 @@ export default function ExerciseCard({
             Delete today
           </button>
         )}
-        <button onClick={() => onRemoveExercise()} className="action-pill-btn action-pill-red">
-          <i className="ti ti-tag-off" />
-          Remove from {workoutType}
-        </button>
+        {(exercise.workout_type_tags || []).length > 1 && (
+          <button onClick={() => onRemoveExercise()} className="action-pill-btn action-pill-red">
+            <i className="ti ti-tag-off" />
+            Remove from {workoutType}
+          </button>
+        )}
       </div>
 
       {/* Expanded form */}

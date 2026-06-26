@@ -378,6 +378,13 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
     const { exercise, isMultiTag } = removeExTarget
 
     if (isMultiTag) {
+      const today = todayStr()
+      // Check before mutations: did this exercise have a log today, and do any others?
+      const hadToday = (logs[exercise.id] || []).some(l => l.log_date === today)
+      const otherHaveToday = exercises.some(ex =>
+        ex.id !== exercise.id && (logs[ex.id] || []).some(l => l.log_date === today)
+      )
+
       // Case A: delete only this category's logs and remove from tags
       const { error: logErr } = await supabase
         .from('exercise_logs')
@@ -405,6 +412,9 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
           [exercise.id]: (prev[exercise.id] || []).filter(l => l.workout_type !== workoutType),
         }))
         showToast(`${exercise.name} removed from ${workoutType}`)
+        if (hadToday && !otherHaveToday) {
+          onResetGymHabit?.()
+        }
       } else {
         showToast('Delete failed — check permissions')
       }
