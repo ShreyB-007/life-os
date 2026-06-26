@@ -11,7 +11,7 @@ import ProgressGraph from './ProgressGraph'
 const WORKOUT_EMOJIS = { Push: '💪', Pull: '🏋️', Legs: '🦵', Cardio: '🏃' }
 
 
-export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose, onDone, onDeleteSession, onFirstExerciseLogged, onTransferComplete }) {
+export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose, onDone, onDeleteSession, onResetGymHabit, onFirstExerciseLogged, onTransferComplete }) {
   const [exercises, setExercises]             = useState([])
   const [logs, setLogs]                       = useState({})
   const [allLogs, setAllLogs]                 = useState({})
@@ -293,6 +293,11 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
     const today = todayStr()
     const updatedLogs = (logs[exercise.id] || []).filter(l => l.log_date !== today)
 
+    // Check before state update: will any other exercise still have a today's session?
+    const otherHaveToday = exercises.some(ex =>
+      ex.id !== exercise.id && (logs[ex.id] || []).some(l => l.log_date === today)
+    )
+
     // Delete today's log for this exercise in this category only
     await supabase.from('exercise_logs').delete()
       .eq('exercise_id', exercise.id)
@@ -322,6 +327,10 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
         ...prev,
         [exercise.id]: (prev[exercise.id] || []).filter(l => !(l.log_date === today && l.workout_type === workoutType)),
       }))
+    }
+
+    if (!otherHaveToday) {
+      onResetGymHabit?.()
     }
   }
 

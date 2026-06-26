@@ -140,6 +140,16 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     setDrawerViewOnly(false)
   }
 
+  // Called when the last exercise's today log is deleted via the per-exercise
+  // "Delete today" button. Resets the habit without closing the drawer so the
+  // user can start a fresh session if they want.
+  function handleResetGymHabit() {
+    setSelected(null)
+    setIsRest(false)
+    setLocallyConfirmedType(null)
+    save(null, false, false)
+  }
+
   // Deletes today's exercise_logs for the given workout type (with no-prior-history
   // cleanup), mirroring WorkoutDrawer's handleDeleteTodaySession.
   async function deleteTodaysSessionForType(workoutType) {
@@ -353,6 +363,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
           onClose={handleDrawerClose}
           onDone={handleDrawerClose}
           onDeleteSession={handleDeleteSession}
+          onResetGymHabit={handleResetGymHabit}
           onFirstExerciseLogged={handleExerciseLogged}
           onTransferComplete={handleTransferComplete}
         />
