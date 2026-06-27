@@ -99,7 +99,7 @@ export default function Dashboard() {
   return (
     <div className="max-w-[1200px] mx-auto px-6 py-8">
       <NeuralConstellation ref={constellationRef} allDone={allDone} />
-      <TopBar overallStreak={overallStreak} gymStreak={gymStreak} />
+      <TopBar overallStreak={overallStreak} />
 
       <AllDoneBanner visible={allDone} />
 

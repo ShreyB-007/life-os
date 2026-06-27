@@ -178,7 +178,7 @@ function getDaysStyle(days) {
 export default function ExerciseCard({
   exercise, logs, allLogs = [], expanded, onToggle, onCollapse,
   onLogSave, onOpenGraph, onDeleteToday, onRemoveExercise, onAddTag,
-  workoutType,
+  workoutType, viewOnly = false,
 }) {
   const today = todayStr()
   const wt    = exercise.weight_type
@@ -727,9 +727,14 @@ export default function ExerciseCard({
           <button
             ref={logBtnRef}
             onClick={handleLog}
-            disabled={saving}
+            disabled={saving || viewOnly}
             className={`mt-4 w-full py-2 rounded-lg text-sm font-body font-semibold transition-all disabled:opacity-60 ${shaking ? 'animate-shake' : showGlow ? 'animate-breathe-glow' : ''}`}
-            style={saved ? {
+            style={viewOnly ? {
+              background: 'rgba(144,144,176,0.08)',
+              border: '1px solid rgba(144,144,176,0.2)',
+              color: 'var(--os-muted)',
+              cursor: 'not-allowed',
+            } : saved ? {
               background: 'rgba(16,185,129,0.1)',
               border: '1px solid rgba(16,185,129,0.3)',
               color: '#10B981',
@@ -743,7 +748,7 @@ export default function ExerciseCard({
               color: 'white',
             }}
           >
-            {saving ? 'Saving…' : saved ? '✓ Logged' : showBlockStyle ? 'Fix errors above' : 'Log workout'}
+            {saving ? 'Saving…' : viewOnly ? 'Logged in another category today' : saved ? '✓ Logged' : showBlockStyle ? 'Fix errors above' : 'Log workout'}
           </button>
         </div>
       )}

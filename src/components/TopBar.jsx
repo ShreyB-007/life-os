@@ -34,7 +34,7 @@ const TIER_CONFIG = {
   },
 }
 
-export default function TopBar({ overallStreak, gymStreak }) {
+export default function TopBar({ overallStreak }) {
   const tier = getStreakTier(overallStreak)
   const next = getNextMilestone(overallStreak)
   const cfg = TIER_CONFIG[tier]

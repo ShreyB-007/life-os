@@ -1,3 +1,5 @@
+import { getLocalDateString } from './dateUtils'
+
 // Returns streak count for a habit given its logs and scheduled rest days
 // logs: array of { log_date: 'YYYY-MM-DD', done: bool, is_rest_day: bool }
 // restDays: array of day-of-week ints (0=Sun) that are scheduled rest days
@@ -7,12 +9,12 @@ export function computeStreak(logs, restDays = []) {
     logMap[log.log_date] = log
   }
 
-  const today = toDateStr(new Date())
+  const today = getLocalDateString()
   let streak = 0
   let cursor = new Date()
 
   while (true) {
-    const dateStr = toDateStr(cursor)
+    const dateStr = getLocalDateString(cursor)
     const dayOfWeek = cursor.getDay()
     const log = logMap[dateStr]
 
@@ -73,12 +75,12 @@ export function computeOverallStreak(gymLogs, japaneseLogs, dsaLogs) {
   for (const l of japaneseLogs) japMap[l.log_date] = l
   for (const l of dsaLogs) dsaMap[l.log_date] = l
 
-  const today = toDateStr(new Date())
+  const today = getLocalDateString()
   let streak = 0
   let cursor = new Date()
 
   while (true) {
-    const dateStr = toDateStr(cursor)
+    const dateStr = getLocalDateString(cursor)
     const gymLog = gymMap[dateStr]
     const gymOk = gymLog?.done === true || gymLog?.is_rest_day === true || cursor.getDay() === 0
     const japOk = japMap[dateStr]?.done === true
@@ -104,12 +106,12 @@ export function computeOverallStreak(gymLogs, japaneseLogs, dsaLogs) {
 
 // Compute per-subtask streak from allLogs for JapaneseCard
 export function computeSubtaskStreak(allLogs, subtaskKey) {
-  const today = toDateStr(new Date())
+  const today = getLocalDateString()
   let streak = 0
   let cursor = new Date()
 
   while (true) {
-    const dateStr = toDateStr(cursor)
+    const dateStr = getLocalDateString(cursor)
     const log = allLogs.find(l => l.log_date === dateStr)
 
     if (dateStr === today && !log?.payload?.subtasks?.[subtaskKey]) {
@@ -130,13 +132,6 @@ export function computeSubtaskStreak(allLogs, subtaskKey) {
   }
 
   return streak
-}
-
-function toDateStr(date) {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
 }
 
 function prevDay(date) {

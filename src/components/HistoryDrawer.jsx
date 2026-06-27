@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { todayStr } from '../lib/date'
 import { getLocalDateString } from '../lib/dateUtils'
+import { ALL_WORKOUT_TYPES } from '../lib/exercise'
 import ProgressGraph from './ProgressGraph'
 import DeleteConfirmModal from './DeleteConfirmModal'
 
-const WORKOUT_TYPES = ['Push', 'Pull', 'Legs', 'Cardio']
+const WORKOUT_TYPES = ALL_WORKOUT_TYPES
 const WORKOUT_EMOJIS = { Push: '💪', Pull: '🏋️', Legs: '🦵', Cardio: '🏃' }
 
 // ── Shared form utilities (mirror of ExerciseCard) ──────────────────────────

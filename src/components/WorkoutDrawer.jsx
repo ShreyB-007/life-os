@@ -625,6 +625,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
                   onRemoveExercise={() => handleRemoveExerciseClick(ex)}
                   onAddTag={handleAddTag}
                   workoutType={workoutType}
+                  viewOnly={viewOnly}
                 />
               ))
             )}

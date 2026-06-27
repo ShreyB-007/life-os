@@ -280,4 +280,5 @@ Report: qa_reports/[filename]
 - 2026-06-26: Global graph + days-since (allLogs state, cross-category graph data, category tooltip label) — 8/8 passed
 - 2026-06-26: Streak reset on per-exercise today-delete (onResetGymHabit, otherHaveToday check) — 5/5 passed
 - 2026-06-27: Hide remove-from-tag for single-category exercises; streak reset on category removal — 8/8 passed
+- 2026-06-27: Cross-category logging lock (viewOnly to ExerciseCard) — 10/10 passed
 
