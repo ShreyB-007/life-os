@@ -360,6 +360,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
           workoutType={drawerWorkoutType}
           fromType={drawerFromType}
           viewOnly={drawerViewOnly}
+          habitConfirmed={isDone}
           onClose={handleDrawerClose}
           onDone={handleDrawerClose}
           onDeleteSession={handleDeleteSession}

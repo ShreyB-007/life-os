@@ -11,7 +11,7 @@ import ProgressGraph from './ProgressGraph'
 const WORKOUT_EMOJIS = { Push: '💪', Pull: '🏋️', Legs: '🦵', Cardio: '🏃' }
 
 
-export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose, onDone, onDeleteSession, onResetGymHabit, onFirstExerciseLogged, onTransferComplete }) {
+export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitConfirmed, onClose, onDone, onDeleteSession, onResetGymHabit, onFirstExerciseLogged, onTransferComplete }) {
   const [exercises, setExercises]             = useState([])
   const [logs, setLogs]                       = useState({})
   const [allLogs, setAllLogs]                 = useState({})
@@ -255,7 +255,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, onClose
       ...prev,
       [exerciseId]: [entry, ...(prev[exerciseId] || []).filter(l => !(l.log_date === entry.log_date && l.workout_type === entry.workout_type))],
     }))
-    if (!alreadyHadTodaySession && entry.log_date === getLocalDate()) {
+    if ((!alreadyHadTodaySession || !habitConfirmed) && entry.log_date === getLocalDate()) {
       onFirstExerciseLogged?.(workoutType)
     }
   }
