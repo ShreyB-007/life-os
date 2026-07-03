@@ -41,6 +41,45 @@ create table if not exists goals (
   sort_order int default 0
 );
 
+-- Phase 3b: Masters research foundation
+create table if not exists countries (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  flag_emoji text not null,
+  added_at timestamptz default now(),
+  static_research jsonb,
+  dynamic_research jsonb,
+  static_researched_at timestamptz,
+  dynamic_refreshed_at timestamptz,
+  personal_notes text default ''
+);
+
+create table if not exists universities (
+  id uuid primary key default gen_random_uuid(),
+  country_id uuid not null references countries(id) on delete cascade,
+  name text not null,
+  city text,
+  added_at timestamptz default now(),
+  static_research jsonb,
+  dynamic_research jsonb,
+  static_researched_at timestamptz,
+  dynamic_refreshed_at timestamptz,
+  personal_notes text default '',
+  unique(country_id, name)
+);
+
+create table if not exists research_sources (
+  id uuid primary key default gen_random_uuid(),
+  entity_type text not null check (entity_type in ('country','university')),
+  entity_id uuid not null,
+  citation_index int not null,
+  source_url text not null,
+  source_title text not null,
+  source_type text default 'web'
+    check (source_type in ('official','reddit','quora','news','ranking','web')),
+  created_at timestamptz default now()
+);
+
 -- ============================================================
 -- Seed habits
 -- ============================================================
@@ -112,6 +151,27 @@ values
 on conflict do nothing;
 
 -- ============================================================
+-- Seed Masters countries
+-- ============================================================
+
+insert into countries (name, flag_emoji)
+select name, flag_emoji
+from (
+  values
+    ('United Kingdom', '🇬🇧'),
+    ('United States', '🇺🇸'),
+    ('Japan', '🇯🇵'),
+    ('Singapore', '🇸🇬'),
+    ('Germany', '🇩🇪'),
+    ('Canada', '🇨🇦'),
+    ('Austria', '🇦🇹'),
+    ('Netherlands', '🇳🇱')
+) as seed(name, flag_emoji)
+where not exists (
+  select 1 from countries where countries.name = seed.name
+);
+
+-- ============================================================
 -- Phase 2: Gym Workout Tracker
 -- ============================================================
 
@@ -143,12 +203,18 @@ create table if not exists exercise_logs (
 alter table habits        enable row level security;
 alter table habit_logs    enable row level security;
 alter table goals         enable row level security;
+alter table countries     enable row level security;
+alter table universities  enable row level security;
+alter table research_sources enable row level security;
 alter table exercises     enable row level security;
 alter table exercise_logs enable row level security;
 
 create policy "anon_all_habits"        on habits        for all to anon using (true) with check (true);
 create policy "anon_all_habit_logs"    on habit_logs    for all to anon using (true) with check (true);
 create policy "anon_all_goals"         on goals         for all to anon using (true) with check (true);
+create policy "anon_all_countries"     on countries     for all to anon using (true) with check (true);
+create policy "anon_all_universities"  on universities  for all to anon using (true) with check (true);
+create policy "anon_all_research_sources" on research_sources for all to anon using (true) with check (true);
 create policy "anon_all_exercises"     on exercises     for all to anon using (true) with check (true);
 create policy "anon_all_exercise_logs" on exercise_logs for all to anon using (true) with check (true);
 

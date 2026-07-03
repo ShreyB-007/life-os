@@ -4,6 +4,8 @@ import Navbar from './components/Navbar'
 import Dashboard from './pages/Dashboard'
 import Goals from './pages/Goals'
 import Masters from './pages/Masters'
+import MastersCountryReport from './pages/MastersCountryReport'
+import MastersUniversityReport from './pages/MastersUniversityReport'
 import Digest from './pages/Digest'
 import Review from './pages/Review'
 import FloatingIcons from './components/FloatingIcons'
@@ -56,6 +58,8 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/masters" element={<Masters />} />
+          <Route path="/masters/country/:countryId" element={<MastersCountryReport />} />
+          <Route path="/masters/university/:universityId" element={<MastersUniversityReport />} />
           <Route path="/digest" element={<Digest />} />
           <Route path="/review" element={<Review />} />
         </Routes>

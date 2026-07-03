@@ -352,6 +352,15 @@ html.dark .gym-rest-btn {
   border-color: rgba(16, 185, 129, 0.6);
 }
 
+.action-pill-amber {
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #F59E0B;
+}
+.action-pill-amber:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.6);
+}
+
 .action-pill-red {
   border: 1px solid rgba(239, 68, 68, 0.3);
   color: #EF4444;
@@ -392,6 +401,21 @@ html.dark .gym-rest-btn {
 
 .nav-link-wash:hover {
   box-shadow: none;
+}
+
+.masters-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  border-radius: 8px;
+  padding: 6px 8px;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.masters-tree-row:hover,
+.masters-tree-row.is-selected {
+  background: rgba(99, 102, 241, 0.08);
 }
 
 /* Nav hover background pill */
