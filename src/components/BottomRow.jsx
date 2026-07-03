@@ -1,7 +1,9 @@
+import { compareDateStrings } from '../lib/goals'
+
 export default function BottomRow({ goals }) {
   const nextMilestoneGoal = goals
     ?.filter(g => g.target_date && g.status === 'active')
-    .sort((a, b) => new Date(a.target_date) - new Date(b.target_date))[0]
+    .sort((a, b) => compareDateStrings(a.target_date, b.target_date))[0]
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

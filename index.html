@@ -4,10 +4,38 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Life OS</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+    <script>
+      ;(() => {
+        const localHosts = new Set(['localhost', '127.0.0.1', '::1'])
+        if (localHosts.has(window.location.hostname)) {
+          document.documentElement.classList.add('local-assets')
+          return
+        }
+
+        const fontPreconnect = document.createElement('link')
+        fontPreconnect.rel = 'preconnect'
+        fontPreconnect.href = 'https://fonts.googleapis.com'
+        document.head.appendChild(fontPreconnect)
+
+        const fontStaticPreconnect = document.createElement('link')
+        fontStaticPreconnect.rel = 'preconnect'
+        fontStaticPreconnect.href = 'https://fonts.gstatic.com'
+        fontStaticPreconnect.crossOrigin = ''
+        document.head.appendChild(fontStaticPreconnect)
+
+        const fonts = document.createElement('link')
+        fonts.rel = 'stylesheet'
+        fonts.href =
+          'https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap'
+        document.head.appendChild(fonts)
+
+        const tabler = document.createElement('link')
+        tabler.rel = 'stylesheet'
+        tabler.href =
+          'https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css'
+        document.head.appendChild(tabler)
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -166,6 +166,24 @@ html.dark {
   }
 }
 
+html.local-assets .ti {
+  display: inline-flex;
+  width: 1em;
+  height: 1em;
+  align-items: center;
+  justify-content: center;
+  vertical-align: -0.12em;
+}
+
+html.local-assets .ti::before {
+  content: '';
+  display: block;
+  width: 0.72em;
+  height: 0.72em;
+  border: 1.7px solid currentColor;
+  border-radius: 999px;
+}
+
 /* ─── Card system ────────────────────────────────────── */
 
 .habit-card {
