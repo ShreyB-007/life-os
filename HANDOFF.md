@@ -1,17 +1,14 @@
 # Life OS — Handoff Log
 
 ## Meta
-Last updated: 2026-07-03T18:08:40+05:30
+Last updated: 2026-07-03T18:19:56+05:30
 Last updated by: Codex
 Current phase: Phase 3 — Goals Page + Masters Research Agent
 
 ## Just Completed (this session)
-- Built Phase 3b Masters research foundation without research calls: two-panel `/masters` layout, desktop tree, mobile slide-in tree, default notes index, and country/university detail panels.
-- Added Supabase schema for `countries`, `universities`, and `research_sources`, RLS policies, and idempotent seed rows for the initial country shortlist.
-- Added country creation, university creation with normalized duplicate validation, country removal, university removal, and app-side `research_sources` cleanup.
-- Added `src/lib/researchStatus.js` for unresearched/stale/complete status and status colors.
-- Added placeholder routes for `/masters/country/:countryId` and `/masters/university/:universityId`.
-- Ran code-reading QA, browser QA, code-quality checks, and production build verification.
+- Fixed Playwright visual QA `vis-03` strict-mode failure by scoping Gym/Japanese/DSA text locators to the `Today's check-ins` habit grid.
+- Verified the focused visual suite passes 4/4 against local preview.
+- Verified production build passes with only Vite's existing chunk-size warning.
 
 ## In Progress (incomplete — pick up here first)
 None — see Queued Next.
@@ -19,7 +16,7 @@ None — see Queued Next.
 ## Queued Next (in priority order)
 1. Run the Phase 3b SQL in Supabase SQL editor so production has `countries`, `universities`, `research_sources`, RLS policies, and seeded countries.
 2. Phase 3c — Masters Research Agent: implement the actual research calls, report pages, source citation storage, and refresh flows.
-3. Re-run browser QA in an environment with Supabase network access allowed, or add an explicit test-only mock mode if offline browser QA should be fully green.
+3. Re-run full browser QA from the user's normal terminal to confirm the selector fix turns the reported 29/30 into 30/30.
 4. Phase 2/3 polish: address any remaining gym tracker, goals, or Masters UX issues the user identifies.
 
 ## Phase Completion Status
@@ -52,6 +49,7 @@ None — see Queued Next.
 - Goals page lists all goals, creates new goals, edits progress/metadata/status, quick-adjusts progress by 5%, deletes goals with rollback on failure, and shows summary metrics.
 - Dashboard next milestone reads active dated goals and sorts by local-safe ISO date string comparison.
 - Masters page loads country/university data, shows tree status dots, notes stars, notes index, research completion counts, add/remove flows, and disabled Phase 3c research actions.
+- Visual QA `vis-03` is scoped to the habit check-ins grid and tolerates duplicate live text elsewhere on the dashboard.
 
 ## Decisions Made (do not reverse without explicit user instruction)
 - Dark mode is default, light mode is secondary.
@@ -78,23 +76,16 @@ None — see Queued Next.
 ## Unresolved Issues
 - DB migration must be run manually in Supabase SQL editor before the workout_type feature works. Migration SQL is in supabase_setup.sql (commented out statements at the bottom).
 - Phase 3b Masters SQL must be run manually in Supabase SQL editor before `/masters` can load live country/university data in production.
-- Browser QA `net-04` fails in the local sandbox because live Supabase requests are blocked with `ERR_NETWORK_ACCESS_DENIED`; see `qa_reports/unresolved_20260703_masters_sandbox_network.md`.
+- Codex-local browser QA `net-04` can fail in the sandbox because live Supabase requests are blocked with `ERR_NETWORK_ACCESS_DENIED`; the user's normal terminal does not show this network failure.
 
 ## Files Changed This Session
-- `src/pages/Masters.jsx` — replaced stub with Phase 3b Masters tree, panels, modals, add/remove flows, notes index, and mobile drawer.
-- `src/pages/MastersCountryReport.jsx` — added placeholder country report route.
-- `src/pages/MastersUniversityReport.jsx` — added placeholder university report route.
-- `src/lib/researchStatus.js` — added status, color, label, and personal-notes helpers.
-- `src/App.jsx` — registered Masters placeholder report routes.
-- `src/index.css` — added Masters tree row styling and amber action-pill button.
-- `supabase_setup.sql` — added Phase 3b schema, country seed, RLS enables, and anon policies.
-- `qa_reports/qa_20260703_masters_foundation.md` — code-reading and browser QA report.
-- `qa_reports/code_quality_20260703_masters_foundation.md` — code-quality report.
-- `qa_reports/unresolved_20260703_masters_sandbox_network.md` — unresolved sandbox network QA note.
+- `qa/tests/visual.spec.mjs` — scoped `vis-03` habit title locators to the `Today's check-ins` container.
+- `qa_reports/qa_20260703_visual_selector_fix.md` — focused QA report.
+- `qa_reports/code_quality_20260703_visual_selector_fix.md` — code-quality report.
 - `CLAUDE.md` — appended QA history entry.
 - `HANDOFF.md` — refreshed session handoff.
 
 ## QA Status
-Last QA run: 2026-07-03T18:08:40+05:30
-Pass rate: 43/44 passed (14/14 code-reading QA, 29/30 browser QA)
-Report: qa_reports/qa_20260703_masters_foundation.md
+Last QA run: 2026-07-03T18:19:56+05:30
+Pass rate: 4/4 focused visual QA passed
+Report: qa_reports/qa_20260703_visual_selector_fix.md

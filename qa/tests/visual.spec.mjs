@@ -20,9 +20,10 @@ test.describe('visual regression', () => {
   test('vis-03 3-column card grid renders correctly', async ({ page }) => {
     await page.goto('/')
     await page.waitForTimeout(500)
-    const gym = page.getByText('Gym', { exact: true })
-    const jp = page.getByText('Japanese', { exact: true })
-    const dsa = page.getByText('DSA', { exact: true })
+    const checkIns = page.locator('.mb-6').filter({ hasText: "Today's check-ins" }).first()
+    const gym = checkIns.getByText('Gym', { exact: true })
+    const jp = checkIns.getByText('Japanese', { exact: true })
+    const dsa = checkIns.getByText('DSA', { exact: true })
     await expect(gym).toBeVisible()
     await expect(jp).toBeVisible()
     await expect(dsa).toBeVisible()
