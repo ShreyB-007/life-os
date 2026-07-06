@@ -1,7 +1,7 @@
 # Life OS — Handoff Log
 
 ## Meta
-Last updated: 2026-07-06T17:34:32+05:30
+Last updated: 2026-07-06T17:42:59+05:30
 Last updated by: Codex
 Current phase: Phase 3 — Goals Page + Masters Research Agent
 
@@ -13,6 +13,7 @@ Current phase: Phase 3 — Goals Page + Masters Research Agent
 - Updated Gemini grounding citation extraction to read `groundingMetadata.webSearchQueries` and `groundingMetadata.groundingChunks` for `research_sources`.
 - Updated Masters research progress labels to match grouped initial and refresh flows.
 - Updated environment documentation to require `GEMINI_API_KEY` for the Edge Function.
+- Deployed `masters-research` to Supabase project `unrqnwcozdthqiduaofg`.
 - Ran code-reading QA, code-quality checks, production build, and browser QA.
 
 ## In Progress (incomplete — pick up here first)
@@ -20,9 +21,8 @@ None — see Queued Next.
 
 ## Queued Next (in priority order)
 1. Configure Supabase Edge Function secret `GEMINI_API_KEY` before using live research.
-2. Redeploy `masters-research` to Supabase so production uses the Gemini grounding implementation.
-3. Smoke-test one country research run from `/masters`, then verify `static_research`, `dynamic_research`, timestamps, and `research_sources` rows in Supabase.
-4. Phase 4 — News Feeds (Gemini), or Phase 3c polish if live research output needs UI/schema adjustments.
+2. Smoke-test one country research run from `/masters`, then verify `static_research`, `dynamic_research`, timestamps, and `research_sources` rows in Supabase.
+3. Phase 4 — News Feeds (Gemini), or Phase 3c polish if live research output needs UI/schema adjustments.
 
 ## Phase Completion Status
 -> Phase 1 (Dashboard + Habits): ✅ Complete
@@ -85,7 +85,7 @@ None — see Queued Next.
 ## Unresolved Issues
 - DB migration must be run manually in Supabase SQL editor before the workout_type feature works. Migration SQL is in supabase_setup.sql (commented out statements at the bottom).
 - Phase 3b Masters SQL must be run manually in Supabase SQL editor before `/masters` can load live country/university data in production.
-- Supabase Edge Function `masters-research` must be redeployed after this commit, and `GEMINI_API_KEY` must be configured as a function secret before live research can run.
+- Supabase Edge Function `masters-research` is deployed with the Gemini grounding implementation, but `GEMINI_API_KEY` must be configured as a function secret before live research can run.
 
 ## Files Changed This Session
 - `.env.example` — documented `GEMINI_API_KEY` as the required Edge Function research secret.
