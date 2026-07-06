@@ -8,6 +8,11 @@ import {
   getStatusLabel,
   hasPersonalNotes,
 } from '../lib/researchStatus'
+import {
+  getResearchKey,
+  getResearchSteps,
+  runMastersResearch,
+} from '../lib/mastersResearch'
 
 const EMPTY_COUNTRY = { name: '', flag_emoji: '' }
 const EMPTY_UNIVERSITY = { name: '', city: '' }
@@ -26,6 +31,7 @@ export default function Masters() {
   const [universityDraft, setUniversityDraft] = useState(EMPTY_UNIVERSITY)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [researching, setResearching] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -290,6 +296,51 @@ export default function Masters() {
     setSaving(false)
   }
 
+  async function handleResearch(entityType, entity, mode = 'initial') {
+    const key = getResearchKey(entityType, entity.id)
+    const steps = getResearchSteps(entityType)
+    setResearching({ key, entityType, label: entity.name, mode, steps, activeStep: 0 })
+    setError('')
+
+    let interval = null
+    try {
+      interval = window.setInterval(() => {
+        setResearching(prev => {
+          if (!prev || prev.key !== key) return prev
+          return {
+            ...prev,
+            activeStep: Math.min(prev.activeStep + 1, prev.steps.length - 1),
+          }
+        })
+      }, 1800)
+
+      const result = await runMastersResearch({
+        entityType,
+        entityId: entity.id,
+        mode,
+      })
+
+      setResearching(prev =>
+        prev && prev.key === key ? { ...prev, activeStep: prev.steps.length } : prev,
+      )
+
+      if (entityType === 'country') {
+        setCountries(prev => prev.map(item => (item.id === entity.id ? result.entity : item)))
+        setSelected({ type: 'country', id: entity.id })
+      } else {
+        setUniversities(prev => prev.map(item => (item.id === entity.id ? result.entity : item)))
+        setSelected({ type: 'university', id: entity.id, countryId: entity.country_id })
+      }
+    } catch (researchError) {
+      setError(researchError.message || 'Research failed.')
+    } finally {
+      if (interval) window.clearInterval(interval)
+      window.setTimeout(() => {
+        setResearching(prev => (prev && prev.key === key ? null : prev))
+      }, 700)
+    }
+  }
+
   return (
     <main className="max-w-[1200px] mx-auto px-6 py-8">
       <div className="mb-4 flex items-center justify-between md:hidden">
@@ -317,6 +368,7 @@ export default function Masters() {
             universitiesByCountry={universitiesByCountry}
             expandedIds={expandedIds}
             selected={selected}
+            researchingKey={researching?.key}
             loading={loading}
             onAddCountry={() => {
               setCountryDraft(EMPTY_COUNTRY)
@@ -343,10 +395,13 @@ export default function Masters() {
             <CountryPanel
               country={selectedCountry}
               universities={universitiesByCountry.get(selectedCountry.id) ?? []}
+              researchState={researching?.key === getResearchKey('country', selectedCountry.id) ? researching : null}
               onAddUniversity={() => openAddUniversity(selectedCountry)}
               onRemove={() => requestRemoveCountry(selectedCountry)}
               onSelectUniversity={selectUniversity}
               onOpenReport={() => navigate(`/masters/country/${selectedCountry.id}`)}
+              onResearch={() => handleResearch('country', selectedCountry, 'initial')}
+              onRefresh={() => handleResearch('country', selectedCountry, 'refresh')}
             />
           )}
 
@@ -354,8 +409,11 @@ export default function Masters() {
             <UniversityPanel
               university={selectedUniversity}
               country={selectedCountry}
+              researchState={researching?.key === getResearchKey('university', selectedUniversity.id) ? researching : null}
               onRemove={() => requestRemoveUniversity(selectedUniversity)}
               onOpenReport={() => navigate(`/masters/university/${selectedUniversity.id}`)}
+              onResearch={() => handleResearch('university', selectedUniversity, 'initial')}
+              onRefresh={() => handleResearch('university', selectedUniversity, 'refresh')}
             />
           )}
         </section>
@@ -373,6 +431,7 @@ export default function Masters() {
               universitiesByCountry={universitiesByCountry}
               expandedIds={expandedIds}
               selected={selected}
+              researchingKey={researching?.key}
               loading={loading}
               onAddCountry={() => {
                 setCountryDraft(EMPTY_COUNTRY)
@@ -424,6 +483,7 @@ function MastersTree({
   universitiesByCountry,
   expandedIds,
   selected,
+  researchingKey,
   loading,
   onAddCountry,
   onToggleCountry,
@@ -456,6 +516,7 @@ function MastersTree({
           const expanded = expandedIds.has(country.id)
           const universities = universitiesByCountry.get(country.id) ?? []
           const isSelected = selected?.type === 'country' && selected.id === country.id
+          const countryResearching = researchingKey === getResearchKey('country', country.id)
 
           return (
             <div key={country.id} className="mb-1">
@@ -464,12 +525,13 @@ function MastersTree({
                 onClick={() => onToggleCountry(country)}
                 className={`masters-tree-row w-full ${isSelected ? 'is-selected' : ''}`}
               >
-                <StatusDot entity={country} size={10} />
+                <StatusDot entity={country} size={10} pulsing={countryResearching} />
                 <span className="text-lg leading-none">{country.flag_emoji}</span>
                 <span className="min-w-0 flex-1 truncate text-left text-sm font-medium text-os-secondary">
                   {country.name}
                 </span>
                 {hasPersonalNotes(country) && <i className="ti ti-star-filled text-[10px] text-os-indigo" />}
+                {countryResearching && <i className="ti ti-loader-2 animate-spin text-xs text-os-indigo" />}
                 <i className={`ti ti-chevron-${expanded ? 'down' : 'right'} text-xs text-os-muted`} />
               </button>
 
@@ -478,6 +540,7 @@ function MastersTree({
                   {universities.map(university => {
                     const uniSelected = selected?.type === 'university' && selected.id === university.id
                     const unresearched = getResearchStatus(university) === 'unresearched'
+                    const universityResearching = researchingKey === getResearchKey('university', university.id)
                     return (
                       <button
                         type="button"
@@ -485,7 +548,7 @@ function MastersTree({
                         onClick={() => onSelectUniversity(university)}
                         className={`masters-tree-row w-full py-1.5 ${uniSelected ? 'is-selected' : ''}`}
                       >
-                        <StatusDot entity={university} size={8} />
+                        <StatusDot entity={university} size={8} pulsing={universityResearching} />
                         <span
                           className={`min-w-0 flex-1 truncate text-left text-xs ${
                             unresearched ? 'text-os-muted' : 'text-os-secondary'
@@ -494,6 +557,7 @@ function MastersTree({
                           {university.name}
                         </span>
                         {hasPersonalNotes(university) && <i className="ti ti-star-filled text-[10px] text-os-indigo" />}
+                        {universityResearching && <i className="ti ti-loader-2 animate-spin text-xs text-os-indigo" />}
                       </button>
                     )
                   })}
@@ -580,9 +644,20 @@ function NotesIndex({ notes, researchedCountries, totalCountries, researchedUniv
   )
 }
 
-function CountryPanel({ country, universities, onAddUniversity, onRemove, onSelectUniversity, onOpenReport }) {
+function CountryPanel({
+  country,
+  universities,
+  researchState,
+  onAddUniversity,
+  onRemove,
+  onSelectUniversity,
+  onOpenReport,
+  onResearch,
+  onRefresh,
+}) {
   const status = getResearchStatus(country)
   const researched = status !== 'unresearched'
+  const running = Boolean(researchState)
 
   return (
     <div className="flex flex-col gap-5">
@@ -594,10 +669,16 @@ function CountryPanel({ country, universities, onAddUniversity, onRemove, onSele
               <i className="ti ti-file-text" />
               Open Report
             </button>
-            <DisabledAction icon="refresh" label="Refresh current data" />
+            <button type="button" onClick={onRefresh} disabled={running} className="action-pill-btn action-pill-amber">
+              <i className={`ti ti-${running ? 'loader-2 animate-spin' : 'refresh'}`} />
+              {running ? `Refreshing ${country.name}...` : 'Refresh current data'}
+            </button>
           </>
         ) : (
-          <DisabledAction icon="search" label="Research this country" primary />
+          <button type="button" onClick={onResearch} disabled={running} className="action-pill-btn action-pill-indigo">
+            <i className={`ti ti-${running ? 'loader-2 animate-spin' : 'search'}`} />
+            {running ? `Researching ${country.name}...` : 'Research this country'}
+          </button>
         )}
         <button type="button" onClick={onAddUniversity} className="action-pill-btn action-pill-emerald">
           <i className="ti ti-school" />
@@ -608,6 +689,8 @@ function CountryPanel({ country, universities, onAddUniversity, onRemove, onSele
           Remove country
         </button>
       </div>
+
+      {researchState && <ResearchProgress state={researchState} />}
 
       <div>
         <p className="mb-3 text-[11px] font-body font-semibold uppercase tracking-widest text-os-muted">
@@ -647,9 +730,10 @@ function CountryPanel({ country, universities, onAddUniversity, onRemove, onSele
   )
 }
 
-function UniversityPanel({ university, country, onRemove, onOpenReport }) {
+function UniversityPanel({ university, country, researchState, onRemove, onOpenReport, onResearch, onRefresh }) {
   const status = getResearchStatus(university)
   const researched = status !== 'unresearched'
+  const running = Boolean(researchState)
 
   return (
     <div className="flex flex-col gap-5">
@@ -666,16 +750,23 @@ function UniversityPanel({ university, country, onRemove, onOpenReport }) {
               <i className="ti ti-file-text" />
               Open Report
             </button>
-            <DisabledAction icon="refresh" label="Refresh current data" />
+            <button type="button" onClick={onRefresh} disabled={running} className="action-pill-btn action-pill-amber">
+              <i className={`ti ti-${running ? 'loader-2 animate-spin' : 'refresh'}`} />
+              {running ? `Refreshing ${university.name}...` : 'Refresh current data'}
+            </button>
           </>
         ) : (
-          <DisabledAction icon="search" label="Research this university" primary />
+          <button type="button" onClick={onResearch} disabled={running} className="action-pill-btn action-pill-indigo">
+            <i className={`ti ti-${running ? 'loader-2 animate-spin' : 'search'}`} />
+            {running ? `Researching ${university.name}...` : 'Research this university'}
+          </button>
         )}
         <button type="button" onClick={onRemove} className="action-pill-btn action-pill-red">
           <i className="ti ti-trash" />
           Remove university
         </button>
       </div>
+      {researchState && <ResearchProgress state={researchState} />}
     </div>
   )
 }
@@ -699,19 +790,33 @@ function EntityHeader({ flag, title, subtitle, entity }) {
   )
 }
 
-function DisabledAction({ icon, label, primary }) {
-  const pillClass = primary ? 'action-pill-indigo' : 'action-pill-amber'
-
+function ResearchProgress({ state }) {
   return (
-    <button
-      type="button"
-      disabled
-      title="Coming soon"
-      className={`action-pill-btn ${pillClass} opacity-60`}
-    >
-      <i className={`ti ti-${icon}`} />
-      {label}
-    </button>
+    <div className="habit-card rounded-xl p-5">
+      <div className="mb-4 flex items-center gap-3">
+        <i className="ti ti-loader-2 animate-spin text-os-indigo" />
+        <div>
+          <h2 className="font-display text-xl font-semibold text-os-fg">
+            {state.mode === 'refresh' ? `Refreshing ${state.label}...` : `Researching ${state.label}...`}
+          </h2>
+          <p className="text-xs text-os-muted">This can take a few minutes because web searches run sequentially.</p>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        {state.steps.map((step, index) => {
+          const done = index < state.activeStep
+          const active = index === state.activeStep
+          return (
+            <div key={step} className="flex items-center gap-2 text-sm">
+              {done && <i className="ti ti-check text-emerald-400" />}
+              {active && <i className="ti ti-loader-2 animate-spin text-os-indigo" />}
+              {!done && !active && <span className="h-4 w-4 rounded-full border border-os-muted/40" />}
+              <span className={done || active ? 'text-os-secondary' : 'text-os-muted'}>{step}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -821,10 +926,10 @@ function ModalField({ label, children }) {
   )
 }
 
-function StatusDot({ entity, size }) {
+function StatusDot({ entity, size, pulsing }) {
   return (
     <span
-      className="shrink-0 rounded-full"
+      className={`shrink-0 rounded-full ${pulsing ? 'animate-pulse' : ''}`}
       style={{
         width: size,
         height: size,

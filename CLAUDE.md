@@ -284,3 +284,4 @@ Report: qa_reports/[filename]
 - 2026-07-03: Goals page CRUD and progress tracking — 12/12 code-reading QA passed; browser QA 29/30 with sandboxed Supabase network denial
 - 2026-07-03: Masters research foundation — 14/14 code-reading QA passed; browser QA 29/30 with sandboxed Supabase network denial
 - 2026-07-03: Visual QA selector fix for duplicate live `Japanese` text — focused visual QA 4/4 passed
+- 2026-07-03: Masters research agent + report pages — code-reading QA 14 pass/1 secrets-pending; browser QA 29/30 in Codex sandbox; build passed
