@@ -1,20 +1,26 @@
 import { supabase } from './supabase'
 
 export const COUNTRY_RESEARCH_STEPS = [
-  'Student experience data collected',
-  'PR pathway data collected',
-  'Cost of living data collected',
-  'Job market analysis collected',
+  'Static country context collected',
+  'Current country data collected',
   'Community sentiment collected',
   'Synthesizing report',
 ]
 
 export const UNIVERSITY_RESEARCH_STEPS = [
-  'Overview data collected',
-  'CS and AI department data collected',
-  'Admission data collected',
-  'Financial data collected',
-  'Student experience data collected',
+  'Static university context collected',
+  'Current admissions and financial data collected',
+  'Community sentiment collected',
+  'Synthesizing report',
+]
+
+const COUNTRY_REFRESH_STEPS = [
+  'Current country data collected',
+  'Synthesizing report',
+]
+
+const UNIVERSITY_REFRESH_STEPS = [
+  'Current admissions and financial data collected',
   'Synthesizing report',
 ]
 
@@ -22,7 +28,10 @@ export function getResearchKey(entityType, id) {
   return `${entityType}:${id}`
 }
 
-export function getResearchSteps(entityType) {
+export function getResearchSteps(entityType, mode = 'initial') {
+  if (mode === 'refresh') {
+    return entityType === 'country' ? COUNTRY_REFRESH_STEPS : UNIVERSITY_REFRESH_STEPS
+  }
   return entityType === 'country' ? COUNTRY_RESEARCH_STEPS : UNIVERSITY_RESEARCH_STEPS
 }
 

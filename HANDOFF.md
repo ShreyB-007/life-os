@@ -1,33 +1,33 @@
 # Life OS — Handoff Log
 
 ## Meta
-Last updated: 2026-07-06T16:45:56+05:30
+Last updated: 2026-07-06T17:34:32+05:30
 Last updated by: Codex
 Current phase: Phase 3 — Goals Page + Masters Research Agent
 
 ## Just Completed (this session)
-- Implemented Phase 3c Masters research flow using a Supabase Edge Function boundary so Claude/Gemini provider keys stay server-side.
-- Added `masters-research` Edge Function with Claude web-search primary path, Gemini grounding fallback path, sequential country/university searches, source extraction, partial-search failure handling, synthesis fallback, and Supabase persistence.
-- Activated Masters landing page research and refresh buttons with loading states, pulsing tree dots, and step-by-step research progress.
-- Replaced placeholder country/university reports with tabbed report pages, citation superscripts, collapsible source lists, status badges, personal notes save-on-blur, refresh actions, and country university lists.
-- Added shared Masters report/rendering helpers and frontend research helpers.
-- Deployed `masters-research` to Supabase project `unrqnwcozdthqiduaofg`.
-- Documented required Edge Function secrets in `.env.example`.
+- Replaced the Masters research Edge Function's Claude web-search path with Gemini Google Search grounding.
+- Added `@google/generative-ai` and routed research calls through `gemini-2.5-flash` with `tools: [{ googleSearch: {} }]`.
+- Consolidated country research into grouped static, dynamic, and Reddit/Quora sentiment prompts followed by final JSON synthesis.
+- Consolidated university research into grouped static, dynamic admissions/financials, and Reddit/Quora sentiment prompts followed by final JSON synthesis.
+- Updated Gemini grounding citation extraction to read `groundingMetadata.webSearchQueries` and `groundingMetadata.groundingChunks` for `research_sources`.
+- Updated Masters research progress labels to match grouped initial and refresh flows.
+- Updated environment documentation to require `GEMINI_API_KEY` for the Edge Function.
 - Ran code-reading QA, code-quality checks, production build, and browser QA.
 
 ## In Progress (incomplete — pick up here first)
 None — see Queued Next.
 
 ## Queued Next (in priority order)
-1. Configure Supabase Edge Function secrets before using live research: `AI_PROVIDER=claude`, `ANTHROPIC_API_KEY`, optional `CLAUDE_MODEL`, optional `GEMINI_API_KEY`, optional `GEMINI_MODEL`.
-2. Smoke-test one country research run from `/masters` after provider secrets are configured, then verify `static_research`, `dynamic_research`, timestamps, and `research_sources` rows in Supabase.
-3. Run full browser QA from the user's normal terminal after secrets are configured.
-4. Phase 4 — News Feeds (Gemini), or Phase 3c polish if research output needs UI/schema adjustments.
+1. Configure Supabase Edge Function secret `GEMINI_API_KEY` before using live research.
+2. Redeploy `masters-research` to Supabase so production uses the Gemini grounding implementation.
+3. Smoke-test one country research run from `/masters`, then verify `static_research`, `dynamic_research`, timestamps, and `research_sources` rows in Supabase.
+4. Phase 4 — News Feeds (Gemini), or Phase 3c polish if live research output needs UI/schema adjustments.
 
 ## Phase Completion Status
 -> Phase 1 (Dashboard + Habits): ✅ Complete
 -> Phase 2 (Gym Workout Tracker): ✅ Feature-complete — all known UX issues resolved
--> Phase 3 (Goals Page + Masters Research Agent): Feature implemented — Goals complete, Masters foundation complete, research agent/report pages implemented; provider secrets still need configuration and live smoke test
+-> Phase 3 (Goals Page + Masters Research Agent): Feature implemented — Goals complete, Masters foundation complete, Gemini-grounded research agent/report pages implemented; provider secret and live smoke test still needed
 -> Phase 4 (News Feeds — Gemini): ⏳ Not started
 -> Phase 5 (Weekly Review + Polish): ⏳ Not started
 
@@ -55,14 +55,15 @@ None — see Queued Next.
 - Dashboard next milestone reads active dated goals and sorts by local-safe ISO date string comparison.
 - Masters page loads country/university data, shows tree status dots, notes stars, notes index, research completion counts, add/remove flows, active research/refresh actions, and step progress during research.
 - Masters country and university report pages render tabbed reports from `static_research` + `dynamic_research`, citation links, source lists, notes, and dynamic refresh actions.
+- Masters research now uses Gemini 2.5 Flash Google Search grounding, grouped prompts, and grounding metadata source extraction.
 - Visual QA `vis-03` is scoped to the habit check-ins grid and tolerates duplicate live text elsewhere on the dashboard.
 
 ## Decisions Made (do not reverse without explicit user instruction)
 - Dark mode is default, light mode is secondary.
 - `getLocalDate()` / `todayStr()` local-date utilities are required for all app date comparisons; do not use UTC date slicing.
 - Date-only goal targets should be formatted by splitting `YYYY-MM-DD` into local date parts, not by UTC parsing.
-- Masters research provider calls live in Supabase Edge Function `masters-research`; never put Anthropic/Gemini/service-role secrets in Vite browser code.
-- Claude web search is the primary provider path; Gemini Google Search grounding is fallback when configured.
+- Masters research provider calls live in Supabase Edge Function `masters-research`; never put Gemini/service-role secrets in Vite browser code.
+- Gemini 2.5 Flash with Google Search grounding is the Masters research provider path; do not reintroduce Claude `web_search`.
 - Masters static research is written only during initial research. Dynamic refresh overwrites `dynamic_research` and `dynamic_refreshed_at` only.
 - Masters research status is client-derived: no `static_researched_at` means unresearched; `dynamic_refreshed_at` older than 180 days means stale; otherwise complete.
 - `research_sources.entity_id` has no FK, so app code deletes related research sources before deleting countries/universities.
@@ -84,23 +85,21 @@ None — see Queued Next.
 ## Unresolved Issues
 - DB migration must be run manually in Supabase SQL editor before the workout_type feature works. Migration SQL is in supabase_setup.sql (commented out statements at the bottom).
 - Phase 3b Masters SQL must be run manually in Supabase SQL editor before `/masters` can load live country/university data in production.
-- Supabase Edge Function `masters-research` is deployed, but provider secrets are not configured yet. Secret list showed only built-in Supabase secrets, not `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, or `AI_PROVIDER`.
-- Codex-local browser QA `net-04` can fail in the sandbox because live Supabase requests are blocked with `ERR_NETWORK_ACCESS_DENIED`; the user's normal terminal does not show this network failure.
+- Supabase Edge Function `masters-research` must be redeployed after this commit, and `GEMINI_API_KEY` must be configured as a function secret before live research can run.
 
 ## Files Changed This Session
-- `src/pages/Masters.jsx` — activated research/refresh buttons, research progress state, pulsing tree rows, and Edge Function invocation.
-- `src/pages/MastersCountryReport.jsx` — replaced placeholder with full tabbed country report, citations, sources, notes, universities, and refresh.
-- `src/pages/MastersUniversityReport.jsx` — replaced placeholder with full tabbed university report, citations, sources, notes, and refresh.
-- `src/components/MastersReportComponents.jsx` — added shared report hero, tabs, citation text, tables, source lists, and personal notes components.
-- `src/lib/mastersResearch.js` — added frontend research invocation, status helpers, JSON merge helpers, citation helpers, and formatting utilities.
-- `supabase/functions/masters-research/index.ts` — added server-side research orchestration function.
-- `.env.example` — documented required Edge Function AI provider secrets.
-- `qa_reports/qa_20260703_masters_research_agent.md` — code-reading and browser QA report.
-- `qa_reports/code_quality_20260703_masters_research_agent.md` — code-quality report.
+- `.env.example` — documented `GEMINI_API_KEY` as the required Edge Function research secret.
+- `package.json` — added `@google/generative-ai`.
+- `package-lock.json` — locked `@google/generative-ai`.
+- `src/lib/mastersResearch.js` — updated grouped research progress labels and refresh-mode steps.
+- `src/pages/Masters.jsx` — passed research mode into progress step selection.
+- `supabase/functions/masters-research/index.ts` — migrated research orchestration to Gemini 2.5 Flash Google Search grounding, grouped prompts, and grounding metadata source extraction.
+- `qa_reports/qa_20260706_gemini_grounding_research.md` — code-reading and browser QA report.
+- `qa_reports/code_quality_20260706_gemini_grounding_research.md` — code-quality report.
 - `CLAUDE.md` — appended QA history entry.
 - `HANDOFF.md` — refreshed session handoff.
 
 ## QA Status
-Last QA run: 2026-07-03T18:50:41+05:30
-Pass rate: code-reading QA 14 pass / 1 secrets-pending; browser QA 29/30 in Codex sandbox; build passed
-Report: qa_reports/qa_20260703_masters_research_agent.md
+Last QA run: 2026-07-06T17:29:57+05:30
+Pass rate: code-reading QA 10/10; browser QA 30/30; build passed
+Report: qa_reports/qa_20260706_gemini_grounding_research.md

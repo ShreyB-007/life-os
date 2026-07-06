@@ -1,44 +1,13 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.107.0'
+import { GoogleGenerativeAI } from 'npm:@google/generative-ai'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const countryStaticSearches = [
-  { key: 'student_experience', label: 'Student experience data collected', query: country => `${country.name} Indian international students experience living working` },
-  { key: 'culture', label: 'Student experience data collected', query: country => `${country.name} foreigner expat reception culture society` },
-  { key: 'pr_pathway', label: 'PR pathway data collected', query: country => `${country.name} permanent residency pathway Indian nationals skilled worker` },
-  { key: 'job_market_static', label: 'Job market analysis collected', query: country => `${country.name} AI ML job market tech industry outlook` },
-  { key: 'reddit_students', label: 'Community sentiment collected', query: country => `site:reddit.com ${country.name} Indian student experience` },
-  { key: 'reddit_pr', label: 'Community sentiment collected', query: country => `site:reddit.com ${country.name} permanent residency process Indian` },
-]
-
-const countryDynamicSearches = [
-  { key: 'pr_processing', label: 'PR pathway data collected', query: country => `${country.name} PR processing time 2025 2026 Indian nationals` },
-  { key: 'cost_living', label: 'Cost of living data collected', query: country => `${country.name} cost of living student budget 2025 2026` },
-  { key: 'salary_jobs', label: 'Job market analysis collected', query: country => `${country.name} AI ML software engineer salary job market 2025 2026` },
-  { key: 'visa_policy', label: 'PR pathway data collected', query: country => `${country.name} international student visa work permit policy 2025 2026` },
-]
-
-const universityStaticSearches = [
-  { key: 'department_reputation', label: 'CS and AI department data collected', query: (university, country) => `${university.name} ${country.name} CS computer science department reputation ranking` },
-  { key: 'faculty', label: 'CS and AI department data collected', query: university => `${university.name} AI machine learning research faculty specialization` },
-  { key: 'student_experience', label: 'Student experience data collected', query: university => `${university.name} international student experience Indian student review` },
-  { key: 'reddit_cs', label: 'Student experience data collected', query: university => `site:reddit.com ${university.name} CS masters review experience` },
-  { key: 'reddit_indian', label: 'Student experience data collected', query: university => `site:reddit.com ${university.name} Indian student masters` },
-  { key: 'rankings', label: 'Overview data collected', query: university => `${university.name} QS ranking 2024 2025 computer science` },
-  { key: 'alumni', label: 'CS and AI department data collected', query: university => `${university.name} alumni career outcomes AI ML industry` },
-]
-
-const universityDynamicSearches = [
-  { key: 'tuition', label: 'Financial data collected', query: university => `${university.name} international tuition fees 2025 2026 masters CS` },
-  { key: 'requirements', label: 'Admission data collected', query: university => `${university.name} masters CS admission requirements 2025 2026 GPA IELTS` },
-  { key: 'deadlines', label: 'Admission data collected', query: university => `${university.name} masters CS application deadline Fall 2027` },
-  { key: 'scholarships', label: 'Financial data collected', query: university => `${university.name} scholarship financial aid international student 2025 2026` },
-  { key: 'intake', label: 'Admission data collected', query: university => `${university.name} masters CS intake size acceptance rate 2025` },
-]
+const GEMINI_MODEL = 'gemini-2.5-flash'
 
 serve(async req => {
   if (req.method === 'OPTIONS') {
@@ -88,28 +57,19 @@ async function loadEntityContext(supabase, entityType, entityId) {
 }
 
 async function collectSearchResults(entityType, context, mode) {
-  const searches =
-    entityType === 'country'
-      ? [...(mode === 'initial' ? countryStaticSearches : []), ...countryDynamicSearches]
-      : [...(mode === 'initial' ? universityStaticSearches : []), ...universityDynamicSearches]
+  const prompts = entityType === 'country'
+    ? buildCountryResearchPrompts(context.country, mode)
+    : buildUniversityResearchPrompts(context.university, context.country, mode)
 
   const results = []
-  for (let index = 0; index < searches.length; index += 1) {
-    const search = searches[index]
-    const query = entityType === 'country'
-      ? search.query(context.country)
-      : search.query(context.university, context.country)
-
+  for (let index = 0; index < prompts.length; index += 1) {
+    const researchPrompt = prompts[index]
     try {
-      const grounded = await callProvider(
-        `Search the web for this exact research topic and return concise factual findings with citations: ${query}`,
-        true,
-      )
-      results.push({ ...search, query, citationIndex: index + 1, ok: true, ...grounded })
+      const grounded = await LLMService.generateGroundedContent(researchPrompt.prompt)
+      results.push({ ...researchPrompt, citationIndex: index + 1, ok: true, ...grounded })
     } catch (error) {
       results.push({
-        ...search,
-        query,
+        ...researchPrompt,
         citationIndex: index + 1,
         ok: false,
         text: 'Data unavailable - search failed',
@@ -118,6 +78,7 @@ async function collectSearchResults(entityType, context, mode) {
       })
     }
   }
+  assignCitationIndexes(results)
   return results
 }
 
@@ -127,7 +88,7 @@ async function synthesizeReport(entityType, context, searchResults) {
     : buildUniversitySynthesisPrompt(context.university, context.country, searchResults)
 
   try {
-    const response = await callProvider(prompt, false)
+    const response = await LLMService.generateContent(prompt)
     return extractJson(response.text)
   } catch (error) {
     return {
@@ -221,127 +182,89 @@ function buildResearchPayload(entityType, mode, report, searchResults, now) {
       }
 }
 
-async function callProvider(prompt, useSearch) {
-  const provider = (Deno.env.get('AI_PROVIDER') ?? 'claude').toLowerCase()
-  if (provider === 'gemini') return callGemini(prompt, useSearch)
+const LLMService = {
+  async generateGroundedContent(prompt) {
+    return this.generateContent(prompt, true)
+  },
 
-  try {
-    return await callClaude(prompt, useSearch)
-  } catch (error) {
-    if (Deno.env.get('GEMINI_API_KEY')) return callGemini(prompt, useSearch)
-    throw error
-  }
+  async generateContent(prompt, useGrounding = false) {
+    const apiKey = Deno.env.get('GEMINI_API_KEY')
+    if (!apiKey) throw new Error('GEMINI_API_KEY is not configured')
+
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL })
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      ...(useGrounding ? { tools: [{ googleSearch: {} }] } : {}),
+    })
+
+    return extractGeminiTextAndCitations(result.response)
+  },
 }
 
-async function callClaude(prompt, useSearch) {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not configured')
-
-  const body = {
-    model: Deno.env.get('CLAUDE_MODEL') ?? 'claude-sonnet-4-6',
-    max_tokens: 4096,
-    messages: [{ role: 'user', content: prompt }],
-    ...(useSearch ? { tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }] } : {}),
-  }
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      'x-api-key': apiKey,
-    },
-    body: JSON.stringify(body),
-  })
-
-  if (!res.ok) throw new Error(`Claude request failed: ${res.status}`)
-  const json = await res.json()
-  return extractClaudeTextAndCitations(json)
-}
-
-async function callGemini(prompt, useSearch) {
-  const apiKey = Deno.env.get('GEMINI_API_KEY')
-  if (!apiKey) throw new Error('GEMINI_API_KEY is not configured')
-
-  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-goog-api-key': apiKey,
-    },
-    body: JSON.stringify({
-      model: Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.5-flash',
-      input: prompt,
-      ...(useSearch ? { tools: [{ type: 'google_search' }] } : {}),
-    }),
-  })
-
-  if (!res.ok) throw new Error(`Gemini request failed: ${res.status}`)
-  const json = await res.json()
-  return extractGeminiTextAndCitations(json)
-}
-
-function extractClaudeTextAndCitations(json) {
+function extractGeminiTextAndCitations(response) {
   const textParts = []
   const citations = []
-  for (const block of json.content ?? []) {
-    if (block.type === 'text') {
-      textParts.push(block.text)
-      for (const citation of block.citations ?? []) {
-        if (citation.url) citations.push({ url: citation.url, title: citation.title ?? citation.url })
-      }
-    }
-    if (block.type === 'web_search_tool_result') {
-      for (const result of block.content ?? []) {
-        if (result.url) citations.push({ url: result.url, title: result.title ?? result.url })
+
+  try {
+    const text = response.text()
+    if (text) textParts.push(text)
+  } catch (_) {
+    for (const candidate of response.candidates ?? []) {
+      for (const part of candidate.content?.parts ?? []) {
+        if (part.text) textParts.push(part.text)
       }
     }
   }
+
+  for (const candidate of response.candidates ?? []) {
+    const metadata = candidate.groundingMetadata ?? {}
+    for (const query of metadata.webSearchQueries ?? []) {
+      citations.push({ url: googleSearchUrl(query), title: query, sourceType: 'web' })
+    }
+    for (const chunk of metadata.groundingChunks ?? []) {
+      const web = chunk.web
+      if (web?.uri) {
+        citations.push({
+          url: web.uri,
+          title: web.title ?? web.uri,
+          sourceType: inferSourceType(`${web.uri} ${web.title ?? ''}`),
+        })
+      }
+    }
+  }
+
   return { text: textParts.join('\n'), citations: dedupeCitations(citations) }
 }
 
-function extractGeminiTextAndCitations(json) {
-  const textParts = []
-  const citations = []
-  for (const step of json.steps ?? []) {
-    if (step.type !== 'model_output') continue
-    for (const block of step.content ?? []) {
-      if (block.type === 'text') {
-        textParts.push(block.text)
-        for (const annotation of block.annotations ?? []) {
-          if (annotation.type === 'url_citation' && annotation.url) {
-            citations.push({ url: annotation.url, title: annotation.title ?? annotation.url })
-          }
-        }
-      }
-    }
-  }
-  return { text: textParts.join('\n') || json.output_text || '', citations: dedupeCitations(citations) }
+function googleSearchUrl(query) {
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}`
 }
 
 function buildSources(entityType, entityId, searchResults) {
   const sources = []
   for (const result of searchResults) {
-    const citation = result.citations?.[0]
-    if (!citation) {
+    if (!result.citations?.length) {
       sources.push({
         entity_type: entityType,
         entity_id: entityId,
         citation_index: result.citationIndex,
-        source_url: `search:${result.query}`,
-        source_title: result.query,
-        source_type: inferSourceType(result.query),
+        source_url: `search:${result.title}`,
+        source_title: result.title,
+        source_type: inferSourceType(result.title),
       })
       continue
     }
-    sources.push({
-      entity_type: entityType,
-      entity_id: entityId,
-      citation_index: result.citationIndex,
-      source_url: citation.url,
-      source_title: citation.title,
-      source_type: inferSourceType(`${citation.url} ${citation.title}`),
-    })
+    for (const citation of result.citations) {
+      sources.push({
+        entity_type: entityType,
+        entity_id: entityId,
+        citation_index: citation.citationIndex,
+        source_url: citation.url,
+        source_title: citation.title,
+        source_type: citation.sourceType ?? inferSourceType(`${citation.url} ${citation.title}`),
+      })
+    }
   }
   return sources
 }
@@ -354,6 +277,124 @@ function inferSourceType(text) {
   if (value.includes('.edu') || value.includes('.ac.') || value.includes('gov')) return 'official'
   if (value.includes('news')) return 'news'
   return 'web'
+}
+
+function buildCountryResearchPrompts(country, mode) {
+  const prompts = []
+  if (mode === 'initial') {
+    prompts.push({
+      key: 'country_static',
+      title: `${country.name} static student, culture, PR, and Indian community research`,
+      label: 'Student, PR, and community data collected',
+      prompt: `Research ${country.name} for an Indian CS/AI Masters student planning long-term settlement.
+
+Use Google Search grounding to find specific, current, source-backed information about:
+- student experience for international and Indian students
+- cultural reception of Indians/foreigners, safety, social life, and language barriers
+- permanent residency pathway overview for Indian skilled workers or international graduates
+- Indian community size, support networks, and settlement experience
+
+Return concise notes grouped under those headings. Include concrete source-backed facts and mention contradictions or uncertainty.`,
+    })
+  }
+
+  prompts.push({
+    key: 'country_dynamic',
+    title: `${country.name} current PR, cost, AI/ML jobs, and policy research`,
+    label: 'Current PR, cost, policy, and job-market data collected',
+    prompt: `Research current 2025/2026 information for ${country.name} for an Indian CS/AI Masters student.
+
+Use Google Search grounding to find specific, current, source-backed information about:
+- PR or skilled migration processing times and eligibility changes
+- cost of living for students in USD, including rent, groceries, transport, and monthly budget
+- AI/ML and software engineering job market, salary ranges, and notable employers
+- recent international student, work permit, post-study work, or immigration policy changes
+
+Prioritize official government/university pages, recent cost guides, salary/job-market sources, and reputable news.`,
+  })
+
+  if (mode === 'initial') {
+    prompts.push({
+      key: 'country_community_sentiment',
+      title: `${country.name} Reddit and Quora Indian student sentiment research`,
+      label: 'Reddit and Quora community sentiment collected',
+      prompt: `Search Reddit and Quora specifically for honest opinions from Indian students, Indian expats, and international graduates about ${country.name}.
+
+Look for recurring positives, recurring negatives, settlement concerns, racism/discrimination concerns, job-search reality, PR frustration, and quality-of-life tradeoffs.
+
+Return a balanced sentiment summary. Include short representative paraphrases rather than long quotes, and identify whether the source is Reddit or Quora where possible.`,
+    })
+  }
+
+  return prompts
+}
+
+function buildUniversityResearchPrompts(university, country, mode) {
+  const location = `${university.name}, ${university.city ?? country.name}, ${country.name}`
+  const prompts = []
+  if (mode === 'initial') {
+    prompts.push({
+      key: 'university_static',
+      title: `${location} static university, CS/AI department, ranking, and outcomes research`,
+      label: 'University overview and CS/AI department data collected',
+      prompt: `Research ${location} for an Indian CS/AI Masters applicant.
+
+Use Google Search grounding to find specific, source-backed information about:
+- university overview: location, founded year, campus, university type, and rankings
+- CS/computer science/AI department reputation and CS-specific rankings
+- AI/ML faculty, research areas, labs, and industry connections
+- alumni outcomes or career outcomes relevant to AI/ML and software roles
+
+Prioritize official university pages, ranking pages, department pages, and credible career outcome sources.`,
+    })
+  }
+
+  prompts.push({
+    key: 'university_dynamic',
+    title: `${location} current admissions, tuition, scholarships, and intake research`,
+    label: 'Current admission and financial data collected',
+    prompt: `Research current 2025/2026 and Fall 2027 admissions information for ${location}.
+
+Use Google Search grounding to find specific, source-backed information about:
+- relevant Masters program names for CS, data science, AI, or machine learning
+- duration, GPA, English test, GRE, work-experience, and prerequisite requirements
+- Fall 2027 application deadlines if available, otherwise the latest published deadline cycle
+- international tuition, total estimated program cost, scholarships, TA/RA funding, and financial aid
+- intake size or acceptance-rate estimates if credible sources exist
+
+Prioritize official admissions, tuition, scholarship, and department pages. Mark unavailable data clearly.`,
+  })
+
+  if (mode === 'initial') {
+    prompts.push({
+      key: 'university_community_sentiment',
+      title: `${location} Reddit and Quora student sentiment research`,
+      label: 'Reddit and Quora university sentiment collected',
+      prompt: `Search Reddit and Quora specifically for honest opinions from Indian students, international students, CS Masters students, and expats about ${location}.
+
+Look for recurring positives, recurring negatives, campus life, housing, Indian community, CS/AI course quality, professor access, job outcomes, internship reality, and city fit.
+
+Return a balanced sentiment summary. Include short representative paraphrases rather than long quotes, and identify whether the source is Reddit or Quora where possible.`,
+    })
+  }
+
+  return prompts
+}
+
+function assignCitationIndexes(results) {
+  let citationIndex = 1
+  for (const result of results) {
+    if (!result.citations?.length) {
+      result.citationIndex = citationIndex
+      citationIndex += 1
+      continue
+    }
+    for (const citation of result.citations) {
+      citation.citationIndex = citationIndex
+      citationIndex += 1
+    }
+    result.citationIndex = result.citations[0].citationIndex
+  }
 }
 
 function buildCountrySynthesisPrompt(country, results) {
@@ -410,7 +451,14 @@ Output schema:
 
 function formatSearchResults(results) {
   return results
-    .map(result => `[${result.citationIndex}] ${result.query}\n${result.text}`)
+    .map(result => {
+      const sources = result.citations?.length
+        ? result.citations
+            .map(citation => `[${citation.citationIndex}] ${citation.title} - ${citation.url}`)
+            .join('\n')
+        : `[${result.citationIndex}] ${result.title}`
+      return `${result.title}\nSources:\n${sources}\nFindings:\n${result.text}`
+    })
     .join('\n\n')
 }
 

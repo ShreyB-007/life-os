@@ -298,7 +298,7 @@ export default function Masters() {
 
   async function handleResearch(entityType, entity, mode = 'initial') {
     const key = getResearchKey(entityType, entity.id)
-    const steps = getResearchSteps(entityType)
+    const steps = getResearchSteps(entityType, mode)
     setResearching({ key, entityType, label: entity.name, mode, steps, activeStep: 0 })
     setError('')
 
