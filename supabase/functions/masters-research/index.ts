@@ -61,22 +61,26 @@ async function collectSearchResults(entityType, context, mode) {
     ? buildCountryResearchPrompts(context.country, mode)
     : buildUniversityResearchPrompts(context.university, context.country, mode)
 
-  const results = []
-  for (let index = 0; index < prompts.length; index += 1) {
-    const researchPrompt = prompts[index]
+  const results = await Promise.all(prompts.map(async (researchPrompt, index) => {
     try {
       const grounded = await LLMService.generateGroundedContent(researchPrompt.prompt)
-      results.push({ ...researchPrompt, citationIndex: index + 1, ok: true, ...grounded })
+      return { ...researchPrompt, citationIndex: index + 1, ok: true, ...grounded }
     } catch (error) {
-      results.push({
+      return {
         ...researchPrompt,
         citationIndex: index + 1,
         ok: false,
         text: 'Data unavailable - search failed',
         error: error.message ?? 'Search failed',
         citations: [],
-      })
+      }
     }
+  }))
+  if (results.every(result => !result.ok) && results.some(result => isQuotaError(result.error))) {
+    throw new Error('Gemini quota exceeded. Research was not saved; retry after quota resets or billing is enabled.')
+  }
+  if (results.every(result => !result.ok)) {
+    throw new Error('All Gemini research prompts failed. Research was not saved; retry later.')
   }
   assignCitationIndexes(results)
   return results
@@ -91,6 +95,9 @@ async function synthesizeReport(entityType, context, searchResults) {
     const response = await LLMService.generateContent(prompt)
     return extractJson(response.text)
   } catch (error) {
+    if (isQuotaError(error.message)) {
+      throw new Error('Gemini quota exceeded during synthesis. Research was not saved; retry after quota resets or billing is enabled.')
+    }
     return {
       synthesis_error: true,
       raw_results: searchResults,
@@ -99,14 +106,22 @@ async function synthesizeReport(entityType, context, searchResults) {
   }
 }
 
+function isQuotaError(message) {
+  return String(message ?? '').includes('[429 Too Many Requests]') ||
+    String(message ?? '').toLowerCase().includes('quota exceeded')
+}
+
 async function saveResearch(supabase, entityType, entityId, mode, report, searchResults, sources) {
   const now = new Date().toISOString()
   const table = entityType === 'country' ? 'countries' : 'universities'
-  const payload = buildResearchPayload(entityType, mode, report, searchResults, now)
+  const sourcePlan = mode === 'refresh'
+    ? await buildRefreshSourcePlan(supabase, table, entityType, entityId, report, searchResults, sources)
+    : { report, searchResults, sources }
+  const payload = buildResearchPayload(entityType, mode, sourcePlan.report, sourcePlan.searchResults, now)
 
   await supabase.from('research_sources').delete().eq('entity_type', entityType).eq('entity_id', entityId)
-  if (sources.length > 0) {
-    const { error: sourceError } = await supabase.from('research_sources').insert(sources)
+  if (sourcePlan.sources.length > 0) {
+    const { error: sourceError } = await supabase.from('research_sources').insert(sourcePlan.sources)
     if (sourceError) throw sourceError
   }
 
@@ -119,6 +134,45 @@ async function saveResearch(supabase, entityType, entityId, mode, report, search
 
   if (error) throw error
   return data
+}
+
+async function buildRefreshSourcePlan(supabase, table, entityType, entityId, report, searchResults, sources) {
+  const { data: current, error: currentError } = await supabase
+    .from(table)
+    .select('static_research')
+    .eq('id', entityId)
+    .single()
+  if (currentError) throw currentError
+
+  const staticCitationIndexes = getCitationIndexesFromJson(current.static_research)
+  const { data: existingSources, error: sourceError } = await supabase
+    .from('research_sources')
+    .select('citation_index, source_url, source_title, source_type')
+    .eq('entity_type', entityType)
+    .eq('entity_id', entityId)
+  if (sourceError) throw sourceError
+
+  const preservedSources = (existingSources ?? [])
+    .filter(source => staticCitationIndexes.has(source.citation_index))
+    .map(source => ({
+      entity_type: entityType,
+      entity_id: entityId,
+      citation_index: source.citation_index,
+      source_url: source.source_url,
+      source_title: source.source_title,
+      source_type: source.source_type,
+    }))
+  const offset = Math.max(0, ...staticCitationIndexes, ...preservedSources.map(source => source.citation_index))
+  const shiftedSources = sources.map(source => ({
+    ...source,
+    citation_index: source.citation_index + offset,
+  }))
+
+  return {
+    report: shiftCitationReferences(report, offset),
+    searchResults: shiftSearchResultCitations(searchResults, offset),
+    sources: [...preservedSources, ...shiftedSources],
+  }
 }
 
 function buildResearchPayload(entityType, mode, report, searchResults, now) {
@@ -219,9 +273,6 @@ function extractGeminiTextAndCitations(response) {
 
   for (const candidate of response.candidates ?? []) {
     const metadata = candidate.groundingMetadata ?? {}
-    for (const query of metadata.webSearchQueries ?? []) {
-      citations.push({ url: googleSearchUrl(query), title: query, sourceType: 'web' })
-    }
     for (const chunk of metadata.groundingChunks ?? []) {
       const web = chunk.web
       if (web?.uri) {
@@ -231,6 +282,9 @@ function extractGeminiTextAndCitations(response) {
           sourceType: inferSourceType(`${web.uri} ${web.title ?? ''}`),
         })
       }
+    }
+    for (const query of metadata.webSearchQueries ?? []) {
+      citations.push({ url: googleSearchUrl(query), title: query, sourceType: 'web' })
     }
   }
 
@@ -274,7 +328,7 @@ function inferSourceType(text) {
   if (value.includes('reddit.com')) return 'reddit'
   if (value.includes('quora.com')) return 'quora'
   if (value.includes('ranking') || value.includes('qs') || value.includes('timeshighereducation')) return 'ranking'
-  if (value.includes('.edu') || value.includes('.ac.') || value.includes('gov')) return 'official'
+  if (value.includes('.edu') || value.includes('.ac.') || value.includes('.go.') || value.includes('gov')) return 'official'
   if (value.includes('news')) return 'news'
   return 'web'
 }
@@ -395,6 +449,42 @@ function assignCitationIndexes(results) {
     }
     result.citationIndex = result.citations[0].citationIndex
   }
+}
+
+function getCitationIndexesFromJson(value) {
+  const indexes = new Set()
+  const text = JSON.stringify(value ?? {})
+  for (const match of text.matchAll(/\[(\d+)\]/g)) {
+    indexes.add(Number(match[1]))
+  }
+  return indexes
+}
+
+function shiftCitationReferences(value, offset) {
+  if (!offset || value === null || value === undefined) return value
+  if (typeof value === 'string') {
+    return value.replace(/\[(\d+)\]/g, (_, number) => `[${Number(number) + offset}]`)
+  }
+  if (Array.isArray(value)) return value.map(item => shiftCitationReferences(item, offset))
+  if (typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, shiftCitationReferences(item, offset)]),
+    )
+  }
+  return value
+}
+
+function shiftSearchResultCitations(results, offset) {
+  if (!offset) return results
+  return results.map(result => ({
+    ...result,
+    citationIndex: result.citationIndex + offset,
+    text: shiftCitationReferences(result.text, offset),
+    citations: (result.citations ?? []).map(citation => ({
+      ...citation,
+      citationIndex: citation.citationIndex + offset,
+    })),
+  }))
 }
 
 function buildCountrySynthesisPrompt(country, results) {

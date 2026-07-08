@@ -40,7 +40,18 @@ export async function runMastersResearch({ entityType, entityId, mode }) {
     body: { entityType, entityId, mode },
   })
 
-  if (error) throw error
+  if (error) {
+    const response = error.context
+    if (response?.json) {
+      let edgeError = ''
+      try {
+        const payload = await response.clone().json()
+        edgeError = payload?.error ?? ''
+      } catch (_) {}
+      if (edgeError) throw new Error(edgeError)
+    }
+    throw error
+  }
   if (data?.error) throw new Error(data.error)
   return data
 }
