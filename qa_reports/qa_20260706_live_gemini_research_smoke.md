@@ -30,13 +30,13 @@ Files read: supabase/functions/masters-research/index.ts, src/lib/mastersResearc
 
 **Result: PASS**
 
-## Scenario 4: University initial research under current quota
+## Scenario 4: University initial research
 
-**Expected:** University endpoint should produce the Phase 3c university JSON schema when Gemini quota is available.
+**Expected:** University endpoint should produce the Phase 3c university JSON schema and store sources.
 
-**Observed:** University of Tokyo initially produced the expected schema before quota exhaustion in an earlier run, but later retries hit Gemini free-tier quota: `GenerateRequestsPerDayPerProjectPerModel-FreeTier`, limit 20 for `gemini-2.5-flash`. After the safeguard fix, quota failures return an Edge Function error and are not saved as broken report JSON.
+**Observed:** After Gemini quota reset, University of Tokyo initial research completed in 58 seconds. Returned schema keys were `overview`, `cs_ai_department`, `admission`, `financials`, `student_experience`, and `honest_assessment`. It returned 59 sources.
 
-**Result: BLOCKED - external Gemini quota**
+**Result: PASS**
 
 ## Scenario 5: Timeout bottleneck
 
@@ -78,16 +78,24 @@ Files read: supabase/functions/masters-research/index.ts, src/lib/mastersResearc
 
 **Result: PASS**
 
+## Scenario 10: Citation ranges
+
+**Expected:** Report text with citation ranges such as `[2-12, 16-19]` should link sources and include all referenced rows in section source lists.
+
+**Observed:** University of Tokyo generated citation ranges in financial fields. `getCitationNumbers()` now expands ranges and comma-separated groups; `CitationText` renders linked citation groups instead of treating ranges as plain text.
+
+**Result: PASS**
+
 ---
 
 ## Summary
 
-Live smoke QA: 8 passed, 1 blocked by Gemini free-tier quota.
+Live smoke QA: 10/10 passed.
 Browser QA: 30/30 passed.
 Build: passed.
 
 ## Notes
 
 - Japan country research is live-verified.
-- University of Tokyo remains added but unresearched because Gemini quota is exhausted.
-- Retest University of Tokyo after quota resets or after Gemini billing/quota is increased.
+- University of Tokyo research is live-verified.
+- Repeated live research can still exhaust Gemini free-tier quota; the Edge Function now fails without saving broken reports in that case.

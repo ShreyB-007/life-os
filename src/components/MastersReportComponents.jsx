@@ -87,29 +87,56 @@ export function ReportSection({ title, children, sources }) {
 
 export function CitationText({ text, sourcesByIndex }) {
   const value = displayValue(text)
-  const parts = value.split(/(\[\d+\])/g)
+  const parts = value.split(/(\[[\d,\s-]+\])/g)
   return (
     <span>
       {parts.map((part, index) => {
-        const match = part.match(/^\[(\d+)\]$/)
-        if (!match) return <span key={`${part}-${index}`}>{part}</span>
-
-        const source = sourcesByIndex.get(Number(match[1]))
-        if (!source) return <sup key={part} className="text-os-indigo">{part}</sup>
-
-        return (
-          <a
-            key={`${part}-${source.source_url}`}
-            href={source.source_url}
-            target="_blank"
-            rel="noreferrer"
-            className="align-super text-[11px] font-semibold text-os-indigo"
-          >
-            {part}
-          </a>
-        )
+        if (!part.match(/^\[[\d,\s-]+\]$/)) return <span key={`${part}-${index}`}>{part}</span>
+        return <CitationGroup key={`${part}-${index}`} token={part} sourcesByIndex={sourcesByIndex} />
       })}
     </span>
+  )
+}
+
+function CitationGroup({ token, sourcesByIndex }) {
+  const content = token.slice(1, -1)
+  const pieces = content.split(/(\d+\s*-\s*\d+|\d+)/g).filter(Boolean)
+
+  return (
+    <sup className="text-[11px] font-semibold text-os-indigo">
+      [
+      {pieces.map((piece, index) => {
+        const range = piece.match(/^(\d+)\s*-\s*(\d+)$/)
+        if (range) {
+          const start = Number(range[1])
+          const end = Number(range[2])
+          return (
+            <span key={`${piece}-${index}`}>
+              <CitationLink number={start} source={sourcesByIndex.get(start)} />
+              -
+              <CitationLink number={end} source={sourcesByIndex.get(end)} />
+            </span>
+          )
+        }
+
+        if (/^\d+$/.test(piece)) {
+          const number = Number(piece)
+          return <CitationLink key={`${piece}-${index}`} number={number} source={sourcesByIndex.get(number)} />
+        }
+
+        return <span key={`${piece}-${index}`}>{piece}</span>
+      })}
+      ]
+    </sup>
+  )
+}
+
+function CitationLink({ number, source }) {
+  if (!source) return <span>{number}</span>
+  return (
+    <a href={source.source_url} target="_blank" rel="noreferrer" className="text-os-indigo">
+      {number}
+    </a>
   )
 }
 

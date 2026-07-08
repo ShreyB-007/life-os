@@ -13,6 +13,7 @@ Date: 2026-07-06
 - Fixed refresh citation integrity by preserving static source rows and offsetting new dynamic citations.
 - Fixed quota/all-failed prompt handling so broken `synthesis_error` payloads are not saved over useful reports.
 - Fixed frontend error handling to surface Edge Function JSON errors such as Gemini quota exhaustion.
+- Fixed report citation parsing/rendering for citation ranges and comma-separated groups.
 
 ## Items Checked with No Issues
 
@@ -23,4 +24,4 @@ Date: 2026-07-06
 
 ## Notes
 
-- Existing Gemini free-tier quota is too low for repeated live country + university research tests in one day.
+- Gemini free-tier quota can still be exhausted by repeated live country + university research tests in one day.

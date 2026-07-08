@@ -1,19 +1,20 @@
 # Life OS — Handoff Log
 
 ## Meta
-Last updated: 2026-07-06T18:47:00+05:30
+Last updated: 2026-07-09T00:44:48+05:30
 Last updated by: Codex
 Current phase: Phase 3 — Goals Page + Masters Research Agent
 
 ## Just Completed (this session)
 - Added/reused live Supabase records for `Japan` and `University of Tokyo`.
 - Live-tested the deployed `masters-research` country endpoint with Japan.
+- Live-tested the deployed `masters-research` university endpoint with University of Tokyo after Gemini quota reset.
 - Fixed Supabase Edge timeout risk by running grouped Gemini grounding prompts concurrently before synthesis.
 - Fixed source quality so Gemini `groundingChunks` are stored before fallback Google search-query URLs.
 - Fixed dynamic refresh source persistence so static citation rows are preserved and new dynamic citations are offset instead of colliding/deleting static sources.
 - Fixed Gemini quota/all-failed prompt handling so failed research is not saved over existing reports.
 - Fixed frontend research error handling to surface Edge Function JSON errors such as quota exhaustion.
-- Cleared the failed quota-error research payload from the University of Tokyo row; the university remains added but unresearched.
+- Fixed report citation parsing/rendering for ranges such as `[2-12, 16-19]`.
 - Deployed the updated `masters-research` Edge Function to Supabase project `unrqnwcozdthqiduaofg`.
 - Ran production build and browser QA.
 
@@ -21,15 +22,14 @@ Current phase: Phase 3 — Goals Page + Masters Research Agent
 None — see Queued Next.
 
 ## Queued Next (in priority order)
-1. Retest University of Tokyo initial research after Gemini quota resets or billing/quota is increased.
-2. Verify the University report page once a successful University of Tokyo report is generated.
-3. Consider adding a visible “provider quota exceeded” friendly state in Masters research UI if repeated live usage will stay on Gemini free tier.
-4. Phase 4 — News Feeds (Gemini), or Phase 3c polish if live research output needs UI/schema adjustments.
+1. Review the live `/masters` country and university report pages in the browser and make any presentation polish adjustments.
+2. Consider adding a visible “provider quota exceeded” friendly state in Masters research UI if repeated live usage will stay on Gemini free tier.
+3. Phase 4 — News Feeds (Gemini), or Phase 3c polish if research output needs UI/schema adjustments.
 
 ## Phase Completion Status
 -> Phase 1 (Dashboard + Habits): ✅ Complete
 -> Phase 2 (Gym Workout Tracker): ✅ Feature-complete — all known UX issues resolved
--> Phase 3 (Goals Page + Masters Research Agent): Feature implemented — Goals complete, Masters foundation complete, Gemini-grounded country research live-verified; university live retest blocked by Gemini free-tier quota
+-> Phase 3 (Goals Page + Masters Research Agent): Feature implemented — Goals complete, Masters foundation complete, Gemini-grounded country and university research live-verified
 -> Phase 4 (News Feeds — Gemini): ⏳ Not started
 -> Phase 5 (Weekly Review + Polish): ⏳ Not started
 
@@ -59,6 +59,8 @@ None — see Queued Next.
 - Masters country and university report pages render tabbed reports from `static_research` + `dynamic_research`, citation links, source lists, notes, and dynamic refresh actions.
 - Masters research uses Gemini 2.5 Flash Google Search grounding, grouped prompts, grounding metadata source extraction, concurrent prompt collection, refresh source preservation, and quota-safe no-save behavior.
 - Japan country research generated a live report with the expected country schema and 141 sources.
+- University of Tokyo research generated a live report with the expected university schema and 59 sources.
+- Citation groups and ranges such as `[2-12, 16-19]` are parsed for source lists and rendered as linked citation groups.
 - Visual QA `vis-03` is scoped to the habit check-ins grid and tolerates duplicate live text elsewhere on the dashboard.
 
 ## Decisions Made (do not reverse without explicit user instruction)
@@ -70,6 +72,7 @@ None — see Queued Next.
 - Masters initial research writes static and dynamic research together; refresh overwrites only `dynamic_research` and `dynamic_refreshed_at`.
 - Masters refresh must preserve source rows cited by static research and offset new dynamic citation indexes.
 - Research runs must not save `synthesis_error` payloads when all grouped prompts fail or Gemini quota is exceeded.
+- Report citation parsing must support single citations, comma-separated citations, and citation ranges.
 - Masters research status is client-derived: no `static_researched_at` means unresearched; `dynamic_refreshed_at` older than 180 days means stale; otherwise complete.
 - `research_sources.entity_id` has no FK, so app code deletes related research sources before deleting countries/universities.
 - Gym workout type selection is not a completed gym habit until at least one exercise set is saved.
@@ -90,17 +93,18 @@ None — see Queued Next.
 ## Unresolved Issues
 - DB migration must be run manually in Supabase SQL editor before the workout_type feature works. Migration SQL is in supabase_setup.sql (commented out statements at the bottom).
 - Phase 3b Masters SQL must be run manually in Supabase SQL editor before `/masters` can load live country/university data in production.
-- Gemini free-tier quota was exhausted during live testing (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, limit 20 for `gemini-2.5-flash`), so University of Tokyo initial research could not be retested successfully after the safeguards. University of Tokyo remains added but unresearched.
+- Repeated live research can exhaust Gemini free-tier quota (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, limit 20 for `gemini-2.5-flash` on the tested key). The Edge Function now fails without saving broken reports when quota is exhausted.
 
 ## Files Changed This Session
 - `supabase/functions/masters-research/index.ts` — made grouped Gemini prompts concurrent, prioritized direct grounding chunks, preserved static sources on refresh, offset dynamic citations, and prevented saving all-failed/quota-error research.
-- `src/lib/mastersResearch.js` — surfaced Edge Function JSON error messages for research failures.
+- `src/lib/mastersResearch.js` — surfaced Edge Function JSON error messages for research failures and expanded citation range parsing.
+- `src/components/MastersReportComponents.jsx` — rendered citation ranges and comma-separated citation groups as linked citations.
 - `qa_reports/qa_20260706_live_gemini_research_smoke.md` — live smoke-test QA report.
 - `qa_reports/code_quality_20260706_live_gemini_research_smoke.md` — code-quality report.
 - `CLAUDE.md` — appended QA history entry.
 - `HANDOFF.md` — refreshed session handoff.
 
 ## QA Status
-Last QA run: 2026-07-06T18:47:00+05:30
-Pass rate: live smoke QA 8 passed / 1 blocked by Gemini quota; browser QA 30/30; build passed
+Last QA run: 2026-07-09T00:44:48+05:30
+Pass rate: live smoke QA 10/10; browser QA 30/30; build passed
 Report: qa_reports/qa_20260706_live_gemini_research_smoke.md

@@ -131,7 +131,23 @@ export function mergeResearch(entityType, entity) {
 
 export function getCitationNumbers(text) {
   if (!text || typeof text !== 'string') return []
-  return [...text.matchAll(/\[(\d+)\]/g)].map(match => Number(match[1]))
+  const numbers = new Set()
+  for (const match of text.matchAll(/\[([\d,\s-]+)\]/g)) {
+    for (const part of match[1].split(',')) {
+      const value = part.trim()
+      const range = value.match(/^(\d+)\s*-\s*(\d+)$/)
+      if (range) {
+        const start = Number(range[1])
+        const end = Number(range[2])
+        const low = Math.min(start, end)
+        const high = Math.max(start, end)
+        for (let number = low; number <= high; number += 1) numbers.add(number)
+      } else if (/^\d+$/.test(value)) {
+        numbers.add(Number(value))
+      }
+    }
+  }
+  return [...numbers]
 }
 
 export function isDynamicStale(entity) {

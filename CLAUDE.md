@@ -287,3 +287,4 @@ Report: qa_reports/[filename]
 - 2026-07-03: Masters research agent + report pages — code-reading QA 14 pass/1 secrets-pending; browser QA 29/30 in Codex sandbox; build passed
 - 2026-07-06: Gemini grounding research agent migration — code-reading QA 10/10 passed; browser QA 30/30 passed; build passed
 - 2026-07-06: Live Gemini research smoke test fixes — Japan country verified; University blocked by Gemini free-tier quota; browser QA 30/30 passed
+- 2026-07-09: University of Tokyo live Gemini research verified; citation range rendering fixed; browser QA 30/30 passed
