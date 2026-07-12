@@ -6,12 +6,13 @@ import {
   KeyValueTable,
   PersonalNotes,
   ReportHero,
+  ReportNotice,
   ReportSection,
   TabBar,
   sectionSources,
   useSourcesByIndex,
 } from '../components/MastersReportComponents'
-import { mergeResearch, runMastersResearch } from '../lib/mastersResearch'
+import { getMastersResearchErrorMessage, mergeResearch, runMastersResearch } from '../lib/mastersResearch'
 import { getResearchStatus, getStatusColor, getStatusLabel } from '../lib/researchStatus'
 import { supabase } from '../lib/supabase'
 
@@ -31,6 +32,7 @@ export default function MastersCountryReport() {
   const [activeTab, setActiveTab] = useState('student')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [refreshError, setRefreshError] = useState('')
 
   useEffect(() => {
     fetchReport()
@@ -51,16 +53,23 @@ export default function MastersCountryReport() {
 
   async function refreshDynamicData() {
     setRefreshing(true)
-    const result = await runMastersResearch({ entityType: 'country', entityId: country.id, mode: 'refresh' })
-    setCountry(result.entity)
-    const { data } = await supabase
-      .from('research_sources')
-      .select('*')
-      .eq('entity_type', 'country')
-      .eq('entity_id', country.id)
-      .order('citation_index')
-    setSources(data ?? [])
-    setRefreshing(false)
+    setRefreshError('')
+
+    try {
+      const result = await runMastersResearch({ entityType: 'country', entityId: country.id, mode: 'refresh' })
+      setCountry(result.entity)
+      const { data } = await supabase
+        .from('research_sources')
+        .select('*')
+        .eq('entity_type', 'country')
+        .eq('entity_id', country.id)
+        .order('citation_index')
+      setSources(data ?? [])
+    } catch (error) {
+      setRefreshError(getMastersResearchErrorMessage(error))
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   const report = useMemo(() => mergeResearch('country', country), [country])
@@ -92,6 +101,12 @@ export default function MastersCountryReport() {
           Add university
         </Link>
       </ReportHero>
+
+      {refreshError && (
+        <div className="mt-5">
+          <ReportNotice tone="amber">{refreshError}</ReportNotice>
+        </div>
+      )}
 
       <TabBar tabs={tabs} activeTab={activeTab} onTab={setActiveTab} />
 

@@ -56,6 +56,17 @@ export async function runMastersResearch({ entityType, entityId, mode }) {
   return data
 }
 
+export function getMastersResearchErrorMessage(error) {
+  const message = error?.message || 'Research failed.'
+  const lower = message.toLowerCase()
+
+  if (lower.includes('quota') || lower.includes('rate limit') || lower.includes('resource_exhausted')) {
+    return 'Provider quota exceeded. Your existing report was not changed; try refreshing again after the Gemini quota resets.'
+  }
+
+  return message
+}
+
 export function splitStaticDynamic(entityType, report) {
   if (!report) return { staticResearch: null, dynamicResearch: null }
 

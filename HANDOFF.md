@@ -1,37 +1,33 @@
-# Life OS — Handoff Log
+# Life OS - Handoff Log
 
 ## Meta
-Last updated: 2026-07-09T00:44:48+05:30
+Last updated: 2026-07-09T01:28:28+05:30
 Last updated by: Codex
-Current phase: Phase 3 — Goals Page + Masters Research Agent
+Current phase: Phase 3 - Goals Page + Masters Research Agent
 
 ## Just Completed (this session)
-- Added/reused live Supabase records for `Japan` and `University of Tokyo`.
-- Live-tested the deployed `masters-research` country endpoint with Japan.
-- Live-tested the deployed `masters-research` university endpoint with University of Tokyo after Gemini quota reset.
-- Fixed Supabase Edge timeout risk by running grouped Gemini grounding prompts concurrently before synthesis.
-- Fixed source quality so Gemini `groundingChunks` are stored before fallback Google search-query URLs.
-- Fixed dynamic refresh source persistence so static citation rows are preserved and new dynamic citations are offset instead of colliding/deleting static sources.
-- Fixed Gemini quota/all-failed prompt handling so failed research is not saved over existing reports.
-- Fixed frontend research error handling to surface Edge Function JSON errors such as quota exhaustion.
-- Fixed report citation parsing/rendering for ranges such as `[2-12, 16-19]`.
-- Deployed the updated `masters-research` Edge Function to Supabase project `unrqnwcozdthqiduaofg`.
+- Reviewed current handoff, latest QA reports, and recent commits before implementation.
+- Attempted local live `/masters` browser review with network approval; current configured Supabase data returned 0 countries and 0 universities, so live report pages were not reachable from local data.
+- Added friendly Masters research quota/rate-limit error normalization.
+- Added inline report-page refresh failure notices for country and university reports.
+- Hardened country and university report refresh actions with `try/catch/finally` so failed provider calls do not leave refresh buttons stuck.
+- Replaced the university report subtitle middle-dot separator with an ASCII separator to avoid mojibake in display contexts.
 - Ran production build and browser QA.
 
-## In Progress (incomplete — pick up here first)
-None — see Queued Next.
+## In Progress (incomplete - pick up here first)
+None - see Queued Next.
 
 ## Queued Next (in priority order)
-1. Review the live `/masters` country and university report pages in the browser and make any presentation polish adjustments.
-2. Consider adding a visible “provider quota exceeded” friendly state in Masters research UI if repeated live usage will stay on Gemini free tier.
-3. Phase 4 — News Feeds (Gemini), or Phase 3c polish if research output needs UI/schema adjustments.
+1. Restore or seed live Masters country/university rows in the configured Supabase project, then review `/masters` country and university report pages in the browser for presentation polish.
+2. Phase 4 - News Feeds (Gemini), or Phase 3c polish if research output needs UI/schema adjustments.
+3. Consider cleaning up pre-existing `logged_at: new Date().toISOString()` timestamp usage if the project wants to enforce the "no toISOString anywhere" code-quality rule literally.
 
 ## Phase Completion Status
--> Phase 1 (Dashboard + Habits): ✅ Complete
--> Phase 2 (Gym Workout Tracker): ✅ Feature-complete — all known UX issues resolved
--> Phase 3 (Goals Page + Masters Research Agent): Feature implemented — Goals complete, Masters foundation complete, Gemini-grounded country and university research live-verified
--> Phase 4 (News Feeds — Gemini): ⏳ Not started
--> Phase 5 (Weekly Review + Polish): ⏳ Not started
+-> Phase 1 (Dashboard + Habits): Complete
+-> Phase 2 (Gym Workout Tracker): Feature-complete - all known UX issues resolved
+-> Phase 3 (Goals Page + Masters Research Agent): Feature implemented - Goals complete, Masters foundation complete, Gemini-grounded country and university research live-verified previously; quota/failure UI now hardened
+-> Phase 4 (News Feeds - Gemini): Not started
+-> Phase 5 (Weekly Review + Polish): Not started
 
 ## Known Working Features (do not regress these)
 - Gym, Japanese, and DSA habit cards with streak tracking.
@@ -40,71 +36,65 @@ None — see Queued Next.
 - Gym workout type selection opens the workout drawer without marking gym done until an exercise set is saved.
 - Rest day still writes immediately and enforces max 2 rest days per Mon-Sun week.
 - WorkoutDrawer supports exercise logging, add exercise, graph view, delete today, remove-from-category (multi-tag only), session delete, and transfer.
-- **Cross-category lock**: if any exercise is logged today in category X, opening any other category drawer disables both "Add exercise" and the "Log workout" button on every ExerciseCard. Button label reads "Logged in another category today".
-- "Remove from {workoutType}" button ONLY shows for exercises tagged to 2+ categories. Single-tag exercises do not show the button.
-- Removing a multi-tag exercise from a category deletes only that category's logs and removes the tag; if the exercise had today's log and no other exercises still have today's logs, `onResetGymHabit` fires (streak reverts, drawer stays open).
-- exercise_logs scoped by workout_type for form/PR/delete: each drawer's form, todayLog, and delete operations only act on the current category.
-- ProgressGraph shows sessions across ALL categories for a cross-tagged exercise. Tooltip includes (CategoryName).
-- Days-since and streak badge (last30Count) reflect the most recent session across ALL categories.
-- "Remove from [WorkoutType]" (Case A): removes tag + deletes only that category's logs; exercise survives in other categories.
-- Transfer: moves today's source logs into the target type using the SAME exercise_id (no duplicate rows ever created). Tags updated in-place. Source tag removed if no remaining logs use it.
-- purgeOrphanDuplicates: on every fetchData, same-name zero-log orphan exercises in the category are auto-deleted.
-- HistoryDrawer groups sessions by workout_type sub-headers for multi-tag exercises.
+- Cross-category lock disables "Add exercise" and "Log workout" in other category drawers when today's session exists in another category.
+- "Remove from [WorkoutType]" only shows for exercises tagged to 2+ categories.
+- Removing a multi-tag exercise from a category deletes only that category's logs and removes the tag; habit reset fires if that removal leaves no gym logs today.
+- `exercise_logs` operations are scoped by `workout_type`.
+- ProgressGraph and days-since can use all category logs for cross-tagged exercises.
 - DSA counters save immediately and restore from today's `habit_logs.payload` on reload.
-- NeuralConstellation cursor attraction remains active while node repulsion prevents pile-ups.
+- NeuralConstellation cursor attraction, node repulsion, and completion pulse remain active.
 - Light/dark theme toggle, FloatingIcons, cursor spotlight, and canvas background remain active.
-- Goals page lists all goals, creates new goals, edits progress/metadata/status, quick-adjusts progress by 5%, deletes goals with rollback on failure, and shows summary metrics.
+- Goals page lists goals, creates goals, edits progress/metadata/status, quick-adjusts progress, deletes goals with rollback, and shows summary metrics.
 - Dashboard next milestone reads active dated goals and sorts by local-safe ISO date string comparison.
-- Masters page loads country/university data, shows tree status dots, notes stars, notes index, research completion counts, add/remove flows, active research/refresh actions, and step progress during research.
-- Masters country and university report pages render tabbed reports from `static_research` + `dynamic_research`, citation links, source lists, notes, and dynamic refresh actions.
+- Masters page loads country/university data, tree status dots, notes stars, notes index, completion counts, add/remove flows, research/refresh actions, and step progress when data exists.
+- Masters report pages render tabbed reports from `static_research` + `dynamic_research`, citation links, source lists, notes, and dynamic refresh actions.
 - Masters research uses Gemini 2.5 Flash Google Search grounding, grouped prompts, grounding metadata source extraction, concurrent prompt collection, refresh source preservation, and quota-safe no-save behavior.
-- Japan country research generated a live report with the expected country schema and 141 sources.
-- University of Tokyo research generated a live report with the expected university schema and 59 sources.
-- Citation groups and ranges such as `[2-12, 16-19]` are parsed for source lists and rendered as linked citation groups.
-- Visual QA `vis-03` is scoped to the habit check-ins grid and tolerates duplicate live text elsewhere on the dashboard.
+- Report citation parsing supports single citations, comma-separated citations, and citation ranges.
+- Masters refresh failures now show a friendly inline notice and preserve existing report data.
+- Browser QA passed 30/30 with network approval on 2026-07-09.
 
 ## Decisions Made (do not reverse without explicit user instruction)
 - Dark mode is default, light mode is secondary.
-- `getLocalDate()` / `todayStr()` local-date utilities are required for all app date comparisons; do not use UTC date slicing.
+- `getLocalDate()` / `todayStr()` local-date utilities are required for app date comparisons; do not use UTC date slicing for local-date behavior.
 - Date-only goal targets should be formatted by splitting `YYYY-MM-DD` into local date parts, not by UTC parsing.
 - Masters research provider calls live in Supabase Edge Function `masters-research`; never put Gemini/service-role secrets in Vite browser code.
 - Gemini 2.5 Flash with Google Search grounding is the Masters research provider path; do not reintroduce Claude `web_search`.
 - Masters initial research writes static and dynamic research together; refresh overwrites only `dynamic_research` and `dynamic_refreshed_at`.
-- Masters refresh must preserve source rows cited by static research and offset new dynamic citation indexes.
+- Masters refresh must preserve source rows cited by static research and offset new dynamic citations.
 - Research runs must not save `synthesis_error` payloads when all grouped prompts fail or Gemini quota is exceeded.
 - Report citation parsing must support single citations, comma-separated citations, and citation ranges.
 - Masters research status is client-derived: no `static_researched_at` means unresearched; `dynamic_refreshed_at` older than 180 days means stale; otherwise complete.
 - `research_sources.entity_id` has no FK, so app code deletes related research sources before deleting countries/universities.
 - Gym workout type selection is not a completed gym habit until at least one exercise set is saved.
 - Rest day is the only gym path that can immediately satisfy gym without exercise logs.
-- exercise_logs unique constraint is `(exercise_id, log_date, workout_type)` — three-column conflict key.
-- All exercise_logs upserts must include `workout_type` and use the new three-column onConflict.
+- `exercise_logs` unique constraint is `(exercise_id, log_date, workout_type)`.
+- All exercise log upserts must include `workout_type` and use the three-column onConflict.
 - Category-scoped delete: multi-tag removes only the current category's logs and tag; single-tag deletes everything.
-- Transfer uses the source exercise's id directly — never inserts a new exercise row. Tags updated via array update.
-- purgeOrphanDuplicates uses count=0 across ALL dates and types as the safe-delete criterion.
-- Graph and days-since are global (allLogs): show data from all categories for cross-tagged exercises.
-- Form, todayLog, PR detection, and delete operations are category-scoped (logs): never bleed across categories.
+- Transfer uses the source exercise's id directly - never inserts a new exercise row.
+- Graph and days-since are global across category logs; forms, todayLog, PR detection, and delete operations are category-scoped.
 - DSA saves immediately on every counter adjustment; no debounce is currently used.
 - Card surfaces use CSS classes (`habit-card`, `habit-card-done`, `drawer-card-bg`) instead of Tailwind dark surface classes.
-- Every session ends with `git push origin main` to trigger Vercel auto-deploy.
-- Cross-category lock applies only to the "Log workout" button and "Add exercise" button — view graph, delete today, and remove-from-category remain functional in viewOnly drawers.
+- Every implementation session ends with QA, code quality, handoff update, commit, and `git push origin main`.
 - Non-local hosts load Google Fonts and Tabler Icons from CDN. Localhost uses the `html.local-assets` fallback to keep browser QA usable when external resources are blocked.
 
 ## Unresolved Issues
 - DB migration must be run manually in Supabase SQL editor before the workout_type feature works. Migration SQL is in supabase_setup.sql (commented out statements at the bottom).
 - Phase 3b Masters SQL must be run manually in Supabase SQL editor before `/masters` can load live country/university data in production.
-- Repeated live research can exhaust Gemini free-tier quota (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, limit 20 for `gemini-2.5-flash` on the tested key). The Edge Function now fails without saving broken reports when quota is exhausted.
+- Repeated live research can exhaust Gemini free-tier quota (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, limit 20 for `gemini-2.5-flash` on the tested key). The UI now surfaces a friendly quota message and keeps existing reports unchanged.
+- Local browser review on 2026-07-09 reached Supabase with network approval but the configured database returned 0 countries and 0 universities, so report-page presentation polish still needs live data or reseeding.
 
 ## Files Changed This Session
-- `supabase/functions/masters-research/index.ts` — made grouped Gemini prompts concurrent, prioritized direct grounding chunks, preserved static sources on refresh, offset dynamic citations, and prevented saving all-failed/quota-error research.
-- `src/lib/mastersResearch.js` — surfaced Edge Function JSON error messages for research failures and expanded citation range parsing.
-- `src/components/MastersReportComponents.jsx` — rendered citation ranges and comma-separated citation groups as linked citations.
-- `qa_reports/qa_20260706_live_gemini_research_smoke.md` — live smoke-test QA report.
-- `qa_reports/code_quality_20260706_live_gemini_research_smoke.md` — code-quality report.
-- `CLAUDE.md` — appended QA history entry.
-- `HANDOFF.md` — refreshed session handoff.
+- `src/lib/mastersResearch.js` - added friendly Masters research error normalization.
+- `src/components/MastersReportComponents.jsx` - added reusable `ReportNotice`.
+- `src/pages/Masters.jsx` - uses friendly research error messages in the main Masters workflow.
+- `src/pages/MastersCountryReport.jsx` - catches refresh failures, clears refresh loading, and shows inline notice.
+- `src/pages/MastersUniversityReport.jsx` - catches refresh failures, clears refresh loading, shows inline notice, and uses ASCII subtitle separator.
+- `qa_reports/qa_20260709_masters_quota_notice.md` - QA report for this change.
+- `qa_reports/code_quality_20260709_masters_quota_notice.md` - code-quality report for this change.
+- `CLAUDE.md` - appended QA history entry.
+- `HANDOFF.md` - refreshed session handoff.
 
 ## QA Status
-Last QA run: 2026-07-09T00:44:48+05:30
-Pass rate: live smoke QA 10/10; browser QA 30/30; build passed
-Report: qa_reports/qa_20260706_live_gemini_research_smoke.md
+Last QA run: 2026-07-09T01:28:28+05:30
+Pass rate: code-reading QA 7/7; browser QA 30/30; build passed
+Report: qa_reports/qa_20260709_masters_quota_notice.md

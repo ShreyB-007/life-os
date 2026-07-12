@@ -5,12 +5,13 @@ import {
   KeyValueTable,
   PersonalNotes,
   ReportHero,
+  ReportNotice,
   ReportSection,
   TabBar,
   sectionSources,
   useSourcesByIndex,
 } from '../components/MastersReportComponents'
-import { mergeResearch, runMastersResearch } from '../lib/mastersResearch'
+import { getMastersResearchErrorMessage, mergeResearch, runMastersResearch } from '../lib/mastersResearch'
 import { supabase } from '../lib/supabase'
 
 const tabs = [
@@ -29,6 +30,7 @@ export default function MastersUniversityReport() {
   const [activeTab, setActiveTab] = useState('overview')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [refreshError, setRefreshError] = useState('')
 
   useEffect(() => {
     fetchReport()
@@ -47,16 +49,23 @@ export default function MastersUniversityReport() {
 
   async function refreshDynamicData() {
     setRefreshing(true)
-    const result = await runMastersResearch({ entityType: 'university', entityId: university.id, mode: 'refresh' })
-    setUniversity({ ...result.entity, countries: university.countries })
-    const { data } = await supabase
-      .from('research_sources')
-      .select('*')
-      .eq('entity_type', 'university')
-      .eq('entity_id', university.id)
-      .order('citation_index')
-    setSources(data ?? [])
-    setRefreshing(false)
+    setRefreshError('')
+
+    try {
+      const result = await runMastersResearch({ entityType: 'university', entityId: university.id, mode: 'refresh' })
+      setUniversity({ ...result.entity, countries: university.countries })
+      const { data } = await supabase
+        .from('research_sources')
+        .select('*')
+        .eq('entity_type', 'university')
+        .eq('entity_id', university.id)
+        .order('citation_index')
+      setSources(data ?? [])
+    } catch (error) {
+      setRefreshError(getMastersResearchErrorMessage(error))
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   const report = useMemo(() => mergeResearch('university', university), [university])
@@ -79,7 +88,7 @@ export default function MastersUniversityReport() {
     <main className="max-w-[1100px] mx-auto px-6 py-8">
       <ReportHero
         title={university.name}
-        subtitle={[university.city, country?.flag_emoji, country?.name].filter(Boolean).join(' · ')}
+        subtitle={[university.city, country?.flag_emoji, country?.name].filter(Boolean).join(' - ')}
         backTo={`/masters/country/${country?.id}`}
         backLabel={country?.name ?? 'Country'}
         entity={university}
@@ -91,6 +100,12 @@ export default function MastersUniversityReport() {
           Remove university
         </Link>
       </ReportHero>
+
+      {refreshError && (
+        <div className="mt-5">
+          <ReportNotice tone="amber">{refreshError}</ReportNotice>
+        </div>
+      )}
 
       <TabBar tabs={tabs} activeTab={activeTab} onTab={setActiveTab} />
       <UniversityTab tab={activeTab} report={report} sources={sources} sourcesByIndex={sourcesByIndex} />

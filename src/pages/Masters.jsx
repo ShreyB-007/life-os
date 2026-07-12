@@ -9,6 +9,7 @@ import {
   hasPersonalNotes,
 } from '../lib/researchStatus'
 import {
+  getMastersResearchErrorMessage,
   getResearchKey,
   getResearchSteps,
   runMastersResearch,
@@ -332,7 +333,7 @@ export default function Masters() {
         setSelected({ type: 'university', id: entity.id, countryId: entity.country_id })
       }
     } catch (researchError) {
-      setError(researchError.message || 'Research failed.')
+      setError(getMastersResearchErrorMessage(researchError))
     } finally {
       if (interval) window.clearInterval(interval)
       window.setTimeout(() => {

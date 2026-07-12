@@ -85,6 +85,24 @@ export function ReportSection({ title, children, sources }) {
   )
 }
 
+export function ReportNotice({ tone = 'amber', children }) {
+  const isError = tone === 'red'
+  const color = isError ? '#EF4444' : '#F59E0B'
+
+  return (
+    <div
+      className="rounded-lg px-4 py-3 text-sm font-body"
+      style={{
+        backgroundColor: `${color}1f`,
+        border: `1px solid ${color}4d`,
+        color,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
 export function CitationText({ text, sourcesByIndex }) {
   const value = displayValue(text)
   const parts = value.split(/(\[[\d,\s-]+\])/g)
