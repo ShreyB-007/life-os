@@ -16,6 +16,26 @@ function isMultipleOf2p5(val) { return Math.abs(roundTo2p5(val) - val) < 0.001 }
 function stripInt(val) { return val.replace(/[^0-9]/g, '') }
 function stripWeight(val) { return val.replace(/[^0-9.]/g, '').replace(/^(\d*\.?\d*).*$/, '$1') }
 
+function normalizeCableSet(set = {}) {
+  return {
+    big: String(set.big ?? set.plates ?? ''),
+    medium: String(set.medium ?? 0),
+    small: String(set.small ?? set.mini ?? ''),
+    reps: String(set.reps ?? ''),
+  }
+}
+
+function cableWeight(set = {}) {
+  return (parseInt(set.big ?? set.plates) || 0) * 7
+    + (parseInt(set.medium) || 0) * 5
+    + (parseInt(set.small ?? set.mini) || 0) * 2.3
+}
+
+function formatCableSet(set) {
+  const normalized = normalizeCableSet(set)
+  return `${normalized.big}B + ${normalized.medium}M + ${normalized.small}S ×${normalized.reps}`
+}
+
 function validateSet(set, wt) {
   const errors = {}
   if (wt === 'barbell' || wt === 'dumbbell') {
@@ -24,11 +44,12 @@ function validateSet(set, wt) {
     else if (!isMultipleOf2p5(w)) errors.weight = 'Must be a multiple of 2.5 kg'
     if (isNaN(r) || r < 1)        errors.reps   = 'Reps must be at least 1'
   } else if (wt === 'cable') {
-    const p = parseInt(set.plates), m = parseInt(set.mini), r = parseInt(set.reps)
-    if (isNaN(p) || p < 1)  errors.plates = 'Plates must be at least 1'
-    if (isNaN(m) || m < 0)  errors.mini   = 'Min 0'
-    else if (m > 2)         errors.mini   = 'Max 2 mini-plates'
-    if (isNaN(r) || r < 1)  errors.reps   = 'Reps must be at least 1'
+    const b = parseInt(set.big), m = parseInt(set.medium), s = parseInt(set.small), r = parseInt(set.reps)
+    if (isNaN(b) || b < 1)  errors.big = 'Big plates must be at least 1'
+    if (isNaN(m) || m < 0)  errors.medium = 'Min 0'
+    if (isNaN(s) || s < 0)  errors.small = 'Min 0'
+    else if (s > 2)         errors.small = 'Max 2 small plates'
+    if (isNaN(r) || r < 1)  errors.reps = 'Reps must be at least 1'
   } else if (wt === 'reps') {
     const r = parseInt(set.reps)
     if (isNaN(r) || r < 1)  errors.reps = 'Reps must be at least 1'
@@ -42,7 +63,7 @@ function validateSet(set, wt) {
 function defaultSets(wt) {
   const e3 = Array.from({ length: 3 })
   if (wt === 'barbell' || wt === 'dumbbell') return e3.map(() => ({ weight: '', reps: '' }))
-  if (wt === 'cable')  return e3.map(() => ({ plates: '', mini: '', reps: '' }))
+  if (wt === 'cable')  return e3.map(() => ({ big: '', medium: '0', small: '', reps: '' }))
   if (wt === 'reps')   return e3.map(() => ({ reps: '' }))
   return e3.map(() => ({ mins: '', secs: '' }))
 }
@@ -51,9 +72,7 @@ function setsFromLog(log, wt) {
   if (!log?.sets?.length) return defaultSets(wt)
   const s = log.sets
   if (wt === 'cable') {
-    return s.map(x => x.plates !== undefined
-      ? { plates: String(x.plates ?? ''), mini: String(x.mini ?? ''), reps: String(x.reps ?? '') }
-      : { plates: '', mini: '', reps: String(x.reps ?? '') })
+    return s.map(x => normalizeCableSet(x))
   }
   if (wt === 'time') {
     return s.map(x => {
@@ -70,7 +89,7 @@ function setsFromLog(log, wt) {
 function buildPayload(sets, wt) {
   return sets.map(s => {
     if (wt === 'barbell' || wt === 'dumbbell') return { weight: parseFloat(s.weight) || 0, reps: parseInt(s.reps) || 0 }
-    if (wt === 'cable')  return { plates: parseInt(s.plates) || 0, mini: parseInt(s.mini) || 0, reps: parseInt(s.reps) || 0 }
+    if (wt === 'cable')  return { big: parseInt(s.big) || 0, medium: parseInt(s.medium) || 0, small: parseInt(s.small) || 0, reps: parseInt(s.reps) || 0 }
     if (wt === 'reps')   return { reps: parseInt(s.reps) || 0 }
     return { duration: (parseInt(s.mins) || 0) * 60 + (parseInt(s.secs) || 0) }
   })
@@ -88,7 +107,7 @@ function getMaxValFromLog(log, wt) {
   if (!log?.sets?.length) return 0
   return Math.max(0, ...log.sets.map(s => {
     if (wt === 'barbell' || wt === 'dumbbell') return parseFloat(s.weight) || 0
-    if (wt === 'cable') return (parseInt(s.plates) || 0) + (parseInt(s.mini) || 0) * 0.5
+    if (wt === 'cable') return cableWeight(s)
     if (wt === 'reps') return parseInt(s.reps) || 0
     return 0
   }))
@@ -104,7 +123,7 @@ function fmtSets(log, wt) {
   if (!log?.sets?.length) return '—'
   const s = log.sets
   if (wt === 'barbell' || wt === 'dumbbell') return s.map(x => `${x.weight}×${x.reps}`).join(' / ')
-  if (wt === 'cable') return s.map(x => x.plates !== undefined ? `P${x.plates}M${x.mini}×${x.reps}` : `${x.weight}×${x.reps}`).join(' / ')
+  if (wt === 'cable') return s.map(x => (x.big !== undefined || x.plates !== undefined) ? formatCableSet(x) : `${x.weight}×${x.reps}`).join(' / ')
   if (wt === 'reps') return s.map(x => `${x.reps}`).join(' / ') + ' reps'
   if (wt === 'time') return s.map(x => {
     const t = x.duration || 0; const m = Math.floor(t / 60), sec = t % 60
@@ -129,8 +148,9 @@ function InlineSessionEditor({ log, exercise, onSave, onCancel }) {
   const [touched, setTouched]         = useState(new Set())
   const [submitAttempted, setSubmitAttempted] = useState(false)
   const [weightNotes, setWeightNotes] = useState(new Set())
-  const [miniNote, setMiniNote]       = useState(null)
+  const [smallNote, setSmallNote]     = useState(null)
   const [timeCapNote, setTimeCapNote] = useState(false)
+  const [focusedDefaultZeros, setFocusedDefaultZeros] = useState(new Set())
 
   const setErrors   = sets.map(s => validateSet(s, wt))
   const formValid   = setErrors.every(e => Object.keys(e).length === 0)
@@ -142,6 +162,25 @@ function InlineSessionEditor({ log, exercise, onSave, onCancel }) {
     return setErrors[idx]?.[field] ? '#EF4444' : '#10B981'
   }
   function touchField(idx, field) { setTouched(prev => new Set([...prev, `${idx}-${field}`])) }
+  function isDefaultZeroField(field) { return wt === 'cable' && (field === 'medium' || field === 'small') }
+  function defaultZeroClass(idx, field) {
+    const key = `${idx}-${field}`
+    return isDefaultZeroField(field) && sets[idx]?.[field] === '0' && !focusedDefaultZeros.has(key) ? 'default-zero' : ''
+  }
+  function handleDefaultZeroFocus(idx, field, event) {
+    if (isDefaultZeroField(field)) setFocusedDefaultZeros(prev => new Set([...prev, `${idx}-${field}`]))
+    event.target.select()
+  }
+  function handleDefaultZeroBlur(idx, field) {
+    touchField(idx, field)
+    if (isDefaultZeroField(field) && sets[idx]?.[field] === '0') {
+      setFocusedDefaultZeros(prev => {
+        const next = new Set(prev)
+        next.delete(`${idx}-${field}`)
+        return next
+      })
+    }
+  }
   function updateSet(idx, field, value) { setSets(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s)) }
   function updateSetMulti(idx, updates) { setSets(prev => prev.map((s, i) => i === idx ? { ...s, ...updates } : s)) }
   function handleIntInput(idx, field, raw) { updateSet(idx, field, stripInt(raw)) }
@@ -165,15 +204,15 @@ function InlineSessionEditor({ log, exercise, onSave, onCancel }) {
     touchField(idx, 'weight')
   }
 
-  function handleMiniInput(idx, raw) {
+  function handleSmallInput(idx, raw) {
     const stripped = stripInt(raw)
     const num = parseInt(stripped) || 0
     if (num > 2) {
-      updateSet(idx, 'mini', '2')
-      setMiniNote({ setIdx: idx })
-      setTimeout(() => setMiniNote(null), 2000)
+      updateSet(idx, 'small', '2')
+      setSmallNote({ setIdx: idx })
+      setTimeout(() => setSmallNote(null), 2000)
     } else {
-      updateSet(idx, 'mini', stripped)
+      updateSet(idx, 'small', stripped)
     }
   }
 
@@ -224,8 +263,9 @@ function InlineSessionEditor({ log, exercise, onSave, onCancel }) {
       {wt === 'cable' && (
         <div className="flex items-center gap-2 mb-1">
           <span className="w-10 flex-shrink-0" />
-          <span className="text-[10px] font-body text-os-muted w-16 text-center">Plates</span>
-          <span className="text-[10px] font-body text-os-muted w-14 text-center">Mini</span>
+          <span className="text-[10px] font-body text-os-muted w-16 text-center">Big</span>
+          <span className="text-[10px] font-body text-os-muted w-16 text-center">Medium</span>
+          <span className="text-[10px] font-body text-os-muted w-14 text-center">Small</span>
           <span className="w-4 flex-shrink-0" />
           <span className="text-[10px] font-body text-os-muted w-16 text-center">Reps</span>
         </div>
@@ -263,12 +303,18 @@ function InlineSessionEditor({ log, exercise, onSave, onCancel }) {
 
                 {wt === 'cable' && (
                   <>
-                    <input type="text" inputMode="numeric" placeholder="1" value={set.plates}
-                      onChange={e => handleIntInput(i, 'plates', e.target.value)} onBlur={() => touchField(i, 'plates')}
-                      className="drawer-input w-16" style={{ borderColor: borderColor(i, 'plates') }} />
-                    <input type="text" inputMode="numeric" placeholder="0" value={set.mini}
-                      onChange={e => handleMiniInput(i, e.target.value)} onBlur={() => touchField(i, 'mini')}
-                      className="drawer-input w-14" style={{ borderColor: borderColor(i, 'mini') }} />
+                    <input type="text" inputMode="numeric" placeholder="1" value={set.big}
+                      onChange={e => handleIntInput(i, 'big', e.target.value)} onBlur={() => touchField(i, 'big')}
+                      onFocus={e => e.target.select()}
+                      className="drawer-input w-16" style={{ borderColor: borderColor(i, 'big') }} />
+                    <input type="text" inputMode="numeric" placeholder="0" value={set.medium}
+                      onChange={e => handleIntInput(i, 'medium', e.target.value)} onBlur={() => handleDefaultZeroBlur(i, 'medium')}
+                      onFocus={e => handleDefaultZeroFocus(i, 'medium', e)}
+                      className={`drawer-input w-16 ${defaultZeroClass(i, 'medium')}`} style={{ borderColor: borderColor(i, 'medium') }} />
+                    <input type="text" inputMode="numeric" placeholder="0" value={set.small}
+                      onChange={e => handleSmallInput(i, e.target.value)} onBlur={() => handleDefaultZeroBlur(i, 'small')}
+                      onFocus={e => handleDefaultZeroFocus(i, 'small', e)}
+                      className={`drawer-input w-14 ${defaultZeroClass(i, 'small')}`} style={{ borderColor: borderColor(i, 'small') }} />
                     <span className="text-xs text-os-muted select-none">×</span>
                     <input type="text" inputMode="numeric" placeholder="reps" value={set.reps}
                       onChange={e => handleIntInput(i, 'reps', e.target.value)} onBlur={() => touchField(i, 'reps')}
@@ -297,8 +343,8 @@ function InlineSessionEditor({ log, exercise, onSave, onCancel }) {
               {showingWeightNote && (
                 <p className="text-[11px] font-body text-amber-500 ml-12 mt-0.5">Rounded to nearest 2.5 kg</p>
               )}
-              {miniNote?.setIdx === i && (
-                <p className="text-[11px] font-body text-amber-500 ml-12 mt-0.5">Max 2 mini-plates</p>
+              {smallNote?.setIdx === i && (
+                <p className="text-[11px] font-body text-amber-500 ml-12 mt-0.5">Max 2 small plates</p>
               )}
               {firstErr && !showingWeightNote && (
                 <p className="text-[11px] font-body text-red-500 ml-12 mt-0.5">{firstErr[1]}</p>

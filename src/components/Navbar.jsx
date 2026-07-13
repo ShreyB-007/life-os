@@ -39,7 +39,7 @@ export default function Navbar({ dark, onToggleDark }) {
                   {isActive && (
                     <span
                       className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full"
-                      style={{ backgroundColor: '#6366F1' }}
+                      style={{ backgroundColor: dark ? '#6366F1' : '#4F46E5' }}
                     />
                   )}
                 </>

@@ -45,6 +45,26 @@ function isMultipleOf2p5(val) { return Math.abs(roundTo2p5(val) - val) < 0.001 }
 function stripInt(val) { return val.replace(/[^0-9]/g, '') }
 function stripWeight(val) { return val.replace(/[^0-9.]/g, '').replace(/^(\d*\.?\d*).*$/, '$1') }
 
+function normalizeCableSet(set = {}) {
+  return {
+    big: String(set.big ?? set.plates ?? ''),
+    medium: String(set.medium ?? 0),
+    small: String(set.small ?? set.mini ?? ''),
+    reps: String(set.reps ?? ''),
+  }
+}
+
+function cableWeight(set = {}) {
+  return (parseInt(set.big ?? set.plates) || 0) * 7
+    + (parseInt(set.medium) || 0) * 5
+    + (parseInt(set.small ?? set.mini) || 0) * 2.3
+}
+
+function formatCableSet(set) {
+  const normalized = normalizeCableSet(set)
+  return `${normalized.big}B + ${normalized.medium}M + ${normalized.small}S ×${normalized.reps}`
+}
+
 function validateSet(set, wt) {
   const errors = {}
   if (wt === 'barbell' || wt === 'dumbbell') {
@@ -53,11 +73,12 @@ function validateSet(set, wt) {
     else if (!isMultipleOf2p5(w))  errors.weight = 'Must be a multiple of 2.5 kg'
     if (isNaN(r) || r < 1)         errors.reps   = 'Reps must be at least 1'
   } else if (wt === 'cable') {
-    const p = parseInt(set.plates), m = parseInt(set.mini), r = parseInt(set.reps)
-    if (isNaN(p) || p < 1)  errors.plates = 'Plates must be at least 1'
-    if (isNaN(m) || m < 0)  errors.mini   = 'Min 0'
-    else if (m > 2)          errors.mini   = 'Max 2 mini-plates'
-    if (isNaN(r) || r < 1)  errors.reps   = 'Reps must be at least 1'
+    const b = parseInt(set.big), m = parseInt(set.medium), s = parseInt(set.small), r = parseInt(set.reps)
+    if (isNaN(b) || b < 1)  errors.big = 'Big plates must be at least 1'
+    if (isNaN(m) || m < 0)  errors.medium = 'Min 0'
+    if (isNaN(s) || s < 0)  errors.small = 'Min 0'
+    else if (s > 2)         errors.small = 'Max 2 small plates'
+    if (isNaN(r) || r < 1)  errors.reps = 'Reps must be at least 1'
   } else if (wt === 'reps') {
     const r = parseInt(set.reps)
     if (isNaN(r) || r < 1)  errors.reps = 'Reps must be at least 1'
@@ -74,8 +95,8 @@ function isSetComplete(set, wt) {
     return !isNaN(w) && w >= 2.5 && isMultipleOf2p5(w) && !isNaN(r) && r >= 1
   }
   if (wt === 'cable') {
-    const p = parseInt(set.plates), m = parseInt(set.mini), r = parseInt(set.reps)
-    return !isNaN(p) && p >= 1 && !isNaN(m) && m >= 0 && m <= 2 && !isNaN(r) && r >= 1
+    const b = parseInt(set.big), m = parseInt(set.medium), s = parseInt(set.small), r = parseInt(set.reps)
+    return !isNaN(b) && b >= 1 && !isNaN(m) && m >= 0 && !isNaN(s) && s >= 0 && s <= 2 && !isNaN(r) && r >= 1
   }
   if (wt === 'reps') return !isNaN(parseInt(set.reps)) && parseInt(set.reps) >= 1
   return (parseInt(set.mins) || 0) * 60 + (parseInt(set.secs) || 0) > 0
@@ -84,14 +105,14 @@ function isSetComplete(set, wt) {
 // Fix 6: default to 1 set with 0 as placeholder values
 function defaultSets(wt) {
   if (wt === 'barbell' || wt === 'dumbbell') return [{ weight: '0', reps: '0' }]
-  if (wt === 'cable')  return [{ plates: '0', mini: '0', reps: '0' }]
+  if (wt === 'cable')  return [{ big: '0', medium: '0', small: '0', reps: '0' }]
   if (wt === 'reps')   return [{ reps: '0' }]
   return [{ mins: '0', secs: '0' }]
 }
 
 function emptySetRow(wt) {
   if (wt === 'barbell' || wt === 'dumbbell') return { weight: '0', reps: '0' }
-  if (wt === 'cable') return { plates: '0', mini: '0', reps: '0' }
+  if (wt === 'cable') return { big: '0', medium: '0', small: '0', reps: '0' }
   if (wt === 'reps') return { reps: '0' }
   return { mins: '0', secs: '0' }
 }
@@ -100,11 +121,7 @@ function setsFromLog(log, wt) {
   if (!log?.sets?.length) return defaultSets(wt)
   const s = log.sets
   if (wt === 'cable') {
-    return s.map(x =>
-      x.plates !== undefined
-        ? { plates: String(x.plates ?? ''), mini: String(x.mini ?? ''), reps: String(x.reps ?? '') }
-        : { plates: '', mini: '', reps: String(x.reps ?? '') }
-    )
+    return s.map(x => normalizeCableSet(x))
   }
   if (wt === 'time') {
     return s.map(x => {
@@ -122,7 +139,7 @@ function formatLastSession(log, wt) {
   if (!log?.sets?.length) return null
   const s = log.sets
   if (wt === 'barbell' || wt === 'dumbbell') return s.map(x => `${x.weight}kg×${x.reps}`).join(' / ')
-  if (wt === 'cable') return s.map(x => x.plates !== undefined ? `P${x.plates} M${x.mini} ×${x.reps}` : `${x.weight}kg×${x.reps}`).join(' / ')
+  if (wt === 'cable') return s.map(x => (x.big !== undefined || x.plates !== undefined) ? formatCableSet(x) : `${x.weight}kg×${x.reps}`).join(' / ')
   if (wt === 'reps') return s.map(x => `${x.reps} reps`).join(' / ')
   if (wt === 'time') {
     return s.map(x => {
@@ -137,7 +154,7 @@ function formatLastSession(log, wt) {
 // Live form value (sets currently being typed — time uses mins/secs strings)
 function getSingleVal(s, wt) {
   if (wt === 'barbell' || wt === 'dumbbell') return parseFloat(s.weight) || 0
-  if (wt === 'cable') return (parseInt(s.plates) || 0) * 7 + (parseInt(s.mini) || 0) * 2.3
+  if (wt === 'cable') return cableWeight(s)
   if (wt === 'reps') return parseInt(s.reps) || 0
   if (wt === 'time') return (parseInt(s.mins) || 0) * 60 + (parseInt(s.secs) || 0)
   return 0
@@ -194,9 +211,10 @@ export default function ExerciseCard({
   const [submitAttempted, setSubmitAttempted] = useState(false)
   const [showTagPicker, setShowTagPicker]     = useState(false)
   const [tagDropdownPos, setTagDropdownPos]   = useState(null)
-  const [miniNote, setMiniNote]               = useState(null)
+  const [smallNote, setSmallNote]             = useState(null)
   const [timeCapNote, setTimeCapNote]         = useState(false)
   const [weightNotes, setWeightNotes]         = useState(new Set())
+  const [focusedDefaultZeros, setFocusedDefaultZeros] = useState(new Set())
   const [comparisonActive, setComparisonActive] = useState(false)
   const [prBadge, setPrBadge]                 = useState(false)
   const [prFlash, setPrFlash]                 = useState(false)
@@ -217,6 +235,7 @@ export default function ExerciseCard({
     setSets(setsFromLog(todayLog, wt))
     setSaved(!!todayLog)
     setTouched(new Set())
+    setFocusedDefaultZeros(new Set())
     setSubmitAttempted(false)
     setComparisonActive(false)
   }, [todayLog?.log_date])
@@ -281,7 +300,7 @@ export default function ExerciseCard({
 
   const anyHasValues = sets.some(s => {
     if (wt === 'barbell' || wt === 'dumbbell') return s.weight || s.reps
-    if (wt === 'cable') return s.plates
+    if (wt === 'cable') return s.big
     return s.reps || s.mins
   })
   const showGlow = formValid && anyHasValues && !saved
@@ -299,6 +318,8 @@ export default function ExerciseCard({
     let cur, last
     if (field === 'weight') {
       cur = parseFloat(sets[setIdx]?.weight); last = parseFloat(ls.weight) || 0
+    } else if (field === 'cableWeight') {
+      cur = cableWeight(sets[setIdx]); last = cableWeight(ls)
     } else {
       cur = parseInt(sets[setIdx]?.reps ?? ''); last = parseInt(ls.reps) || 0
     }
@@ -323,6 +344,25 @@ export default function ExerciseCard({
     return setErrors[idx]?.[field] ? '#EF4444' : '#10B981'
   }
   function touchField(idx, field) { setTouched(prev => new Set([...prev, `${idx}-${field}`])) }
+  function isDefaultZeroField(field) { return wt === 'cable' && (field === 'medium' || field === 'small') }
+  function defaultZeroClass(idx, field) {
+    const key = `${idx}-${field}`
+    return isDefaultZeroField(field) && sets[idx]?.[field] === '0' && !focusedDefaultZeros.has(key) ? 'default-zero' : ''
+  }
+  function handleDefaultZeroFocus(idx, field, event) {
+    if (isDefaultZeroField(field)) setFocusedDefaultZeros(prev => new Set([...prev, `${idx}-${field}`]))
+    event.target.select()
+  }
+  function handleDefaultZeroBlur(idx, field) {
+    touchField(idx, field)
+    if (isDefaultZeroField(field) && sets[idx]?.[field] === '0') {
+      setFocusedDefaultZeros(prev => {
+        const next = new Set(prev)
+        next.delete(`${idx}-${field}`)
+        return next
+      })
+    }
+  }
 
   function updateSet(idx, field, value) {
     setSets(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s))
@@ -365,15 +405,15 @@ export default function ExerciseCard({
     }
   }
 
-  function handleMiniInput(idx, raw) {
+  function handleSmallInput(idx, raw) {
     const stripped = stripInt(raw)
     const num = parseInt(stripped) || 0
     if (num > 2) {
-      updateSet(idx, 'mini', '2')
-      setMiniNote({ setIdx: idx })
-      setTimeout(() => setMiniNote(null), 2000)
+      updateSet(idx, 'small', '2')
+      setSmallNote({ setIdx: idx })
+      setTimeout(() => setSmallNote(null), 2000)
     } else {
-      updateSet(idx, 'mini', stripped)
+      updateSet(idx, 'small', stripped)
     }
   }
 
@@ -413,7 +453,7 @@ export default function ExerciseCard({
   function buildPayload() {
     return sets.map(s => {
       if (wt === 'barbell' || wt === 'dumbbell') return { weight: parseFloat(s.weight) || 0, reps: parseInt(s.reps) || 0 }
-      if (wt === 'cable') return { plates: parseInt(s.plates) || 0, mini: parseInt(s.mini) || 0, reps: parseInt(s.reps) || 0 }
+      if (wt === 'cable') return { big: parseInt(s.big) || 0, medium: parseInt(s.medium) || 0, small: parseInt(s.small) || 0, reps: parseInt(s.reps) || 0 }
       if (wt === 'reps') return { reps: parseInt(s.reps) || 0 }
       return { duration: (parseInt(s.mins) || 0) * 60 + (parseInt(s.secs) || 0) }
     })
@@ -570,8 +610,9 @@ export default function ExerciseCard({
           {wt === 'cable' && (
             <div className="flex items-center gap-2 mb-1 mt-3">
               <span className="w-6 flex-shrink-0" />
-              <span className="text-[10px] font-body text-os-muted w-16 text-center">Plates</span>
-              <span className="text-[10px] font-body text-os-muted w-14 text-center">Mini</span>
+              <span className="text-[10px] font-body text-os-muted w-16 text-center">Big</span>
+              <span className="text-[10px] font-body text-os-muted w-16 text-center">Medium</span>
+              <span className="text-[10px] font-body text-os-muted w-14 text-center">Small</span>
               <span className="w-4 flex-shrink-0" />
               <span className="text-[10px] font-body text-os-muted w-16 text-center">Reps</span>
             </div>
@@ -648,16 +689,26 @@ export default function ExerciseCard({
 
                     {wt === 'cable' && (
                       <>
-                        <input type="text" inputMode="numeric" placeholder="1" value={set.plates}
-                          onChange={e => handleIntInput(i, 'plates', e.target.value)} onBlur={() => touchField(i, 'plates')}
+                        <input type="text" inputMode="numeric" placeholder="1" value={set.big}
+                          onChange={e => handleIntInput(i, 'big', e.target.value)} onBlur={() => touchField(i, 'big')}
                           onFocus={e => e.target.select()}
-                          className={`drawer-input w-16 ${shaking && errs.plates ? 'animate-shake' : ''}`}
-                          style={{ borderColor: borderColor(i, 'plates') }} />
-                        <input type="text" inputMode="numeric" placeholder="0" value={set.mini}
-                          onChange={e => handleMiniInput(i, e.target.value)} onBlur={() => touchField(i, 'mini')}
-                          onFocus={e => e.target.select()}
-                          className={`drawer-input w-14 ${shaking && errs.mini ? 'animate-shake' : ''}`}
-                          style={{ borderColor: borderColor(i, 'mini') }} />
+                          className={`drawer-input w-16 ${shaking && errs.big ? 'animate-shake' : ''}`}
+                          style={{ borderColor: borderColor(i, 'big'), ...glowStyle(i, 'cableWeight') }} />
+                        <input type="text" inputMode="numeric" placeholder="0" value={set.medium}
+                          onChange={e => handleIntInput(i, 'medium', e.target.value)} onBlur={() => handleDefaultZeroBlur(i, 'medium')}
+                          onFocus={e => handleDefaultZeroFocus(i, 'medium', e)}
+                          className={`drawer-input w-16 ${defaultZeroClass(i, 'medium')} ${shaking && errs.medium ? 'animate-shake' : ''}`}
+                          style={{ borderColor: borderColor(i, 'medium'), ...glowStyle(i, 'cableWeight') }} />
+                        <input type="text" inputMode="numeric" placeholder="0" value={set.small}
+                          onChange={e => handleSmallInput(i, e.target.value)} onBlur={() => handleDefaultZeroBlur(i, 'small')}
+                          onFocus={e => handleDefaultZeroFocus(i, 'small', e)}
+                          className={`drawer-input w-14 ${defaultZeroClass(i, 'small')} ${shaking && errs.small ? 'animate-shake' : ''}`}
+                          style={{ borderColor: borderColor(i, 'small'), ...glowStyle(i, 'cableWeight') }} />
+                        {comparisonActive && getCompare(i, 'cableWeight') && (
+                          <span style={{ color: getCompare(i, 'cableWeight') === 'up' ? '#10B981' : '#F59E0B', fontSize: 11, fontWeight: 700 }}>
+                            {getCompare(i, 'cableWeight') === 'up' ? '↑' : '↓'}
+                          </span>
+                        )}
                         <span className="text-xs text-os-muted select-none">×</span>
                         <input type="text" inputMode="numeric" placeholder="reps" value={set.reps}
                           onChange={e => handleIntInput(i, 'reps', e.target.value)} onBlur={() => touchField(i, 'reps')}
@@ -701,8 +752,8 @@ export default function ExerciseCard({
                   {showingWeightNote && (
                     <p className="text-[11px] font-body text-amber-500 ml-12 mt-0.5">Rounded to nearest 2.5 kg</p>
                   )}
-                  {miniNote?.setIdx === i && (
-                    <p className="text-[11px] font-body text-amber-500 ml-12 mt-0.5">Max 2 mini-plates</p>
+                  {smallNote?.setIdx === i && (
+                    <p className="text-[11px] font-body text-amber-500 ml-12 mt-0.5">Max 2 small plates</p>
                   )}
                   {firstErr && !showingWeightNote && (
                     <p className="text-[11px] font-body text-red-500 ml-12 mt-0.5">{firstErr[1]}</p>

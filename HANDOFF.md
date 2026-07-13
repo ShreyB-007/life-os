@@ -1,31 +1,33 @@
 # Life OS - Handoff Log
 
 ## Meta
-Last updated: 2026-07-09T01:28:28+05:30
+Last updated: 2026-07-13T14:00:58+05:30
 Last updated by: Codex
 Current phase: Phase 3 - Goals Page + Masters Research Agent
 
 ## Just Completed (this session)
-- Reviewed current handoff, latest QA reports, and recent commits before implementation.
-- Attempted local live `/masters` browser review with network approval; current configured Supabase data returned 0 countries and 0 universities, so live report pages were not reachable from local data.
-- Added friendly Masters research quota/rate-limit error normalization.
-- Added inline report-page refresh failure notices for country and university reports.
-- Hardened country and university report refresh actions with `try/catch/finally` so failed provider calls do not leave refresh buttons stuck.
-- Replaced the university report subtitle middle-dot separator with an ASCII separator to avoid mojibake in display contexts.
-- Ran production build and browser QA.
+- Read AGENTS.md, HANDOFF.md, latest QA reports, and recent commits before implementation.
+- Fixed navbar hover/focus contrast in dark and light mode with explicit readable text/background states and active underline colors.
+- Added global placeholder styling in src/index.css and cable-specific `.default-zero` styling for zero-valid plate fields.
+- Added cable Medium plate support and renamed cable plate UI to Big, Medium, and Small.
+- Updated cable payload writes to `{ big, medium, small, reps }` while preserving compatibility with old `{ plates, mini, reps }` rows.
+- Updated cable PR detection, progressive overload arrows, history PR detection, last-session displays, history displays, and progress graph tooltip/formula to include medium plates.
+- Added the cable payload migration SQL to supabase_setup.sql.
+- Ran production build, code-reading QA, code-quality review, and browser QA.
 
 ## In Progress (incomplete - pick up here first)
 None - see Queued Next.
 
 ## Queued Next (in priority order)
-1. Restore or seed live Masters country/university rows in the configured Supabase project, then review `/masters` country and university report pages in the browser for presentation polish.
-2. Phase 4 - News Feeds (Gemini), or Phase 3c polish if research output needs UI/schema adjustments.
-3. Consider cleaning up pre-existing `logged_at: new Date().toISOString()` timestamp usage if the project wants to enforce the "no toISOString anywhere" code-quality rule literally.
+1. Run the cable payload migration at the bottom of supabase_setup.sql in the Supabase SQL editor to convert existing `{ plates, mini, reps }` rows to `{ big, medium, small, reps }`.
+2. Restore or seed live Masters country/university rows in the configured Supabase project, then review `/masters` country and university report pages in the browser for presentation polish.
+3. Phase 4 - News Feeds (Gemini), or Phase 3c polish if research output needs UI/schema adjustments.
+4. Consider cleaning up pre-existing `logged_at: new Date().toISOString()` timestamp usage if the project wants to enforce the "no toISOString anywhere" code-quality rule literally.
 
 ## Phase Completion Status
 -> Phase 1 (Dashboard + Habits): Complete
--> Phase 2 (Gym Workout Tracker): Feature-complete - all known UX issues resolved
--> Phase 3 (Goals Page + Masters Research Agent): Feature implemented - Goals complete, Masters foundation complete, Gemini-grounded country and university research live-verified previously; quota/failure UI now hardened
+-> Phase 2 (Gym Workout Tracker): Feature-complete - cable medium plate support added; existing DB rows need migration
+-> Phase 3 (Goals Page + Masters Research Agent): Feature implemented - Goals complete, Masters foundation complete, Gemini-grounded country and university research live-verified previously; quota/failure UI hardened
 -> Phase 4 (News Feeds - Gemini): Not started
 -> Phase 5 (Weekly Review + Polish): Not started
 
@@ -36,6 +38,8 @@ None - see Queued Next.
 - Gym workout type selection opens the workout drawer without marking gym done until an exercise set is saved.
 - Rest day still writes immediately and enforces max 2 rest days per Mon-Sun week.
 - WorkoutDrawer supports exercise logging, add exercise, graph view, delete today, remove-from-category (multi-tag only), session delete, and transfer.
+- Cable exercises support Big 7kg, Medium 5kg, and Small 2.3kg plates with `{ big, medium, small, reps }` payloads.
+- Old cable rows using `{ plates, mini, reps }` still render and calculate correctly in the frontend until migrated.
 - Cross-category lock disables "Add exercise" and "Log workout" in other category drawers when today's session exists in another category.
 - "Remove from [WorkoutType]" only shows for exercises tagged to 2+ categories.
 - Removing a multi-tag exercise from a category deletes only that category's logs and removes the tag; habit reset fires if that removal leaves no gym logs today.
@@ -51,10 +55,14 @@ None - see Queued Next.
 - Masters research uses Gemini 2.5 Flash Google Search grounding, grouped prompts, grounding metadata source extraction, concurrent prompt collection, refresh source preservation, and quota-safe no-save behavior.
 - Report citation parsing supports single citations, comma-separated citations, and citation ranges.
 - Masters refresh failures now show a friendly inline notice and preserve existing report data.
-- Browser QA passed 30/30 with network approval on 2026-07-09.
+- Browser QA passed 30/30 with network approval on 2026-07-13.
 
 ## Decisions Made (do not reverse without explicit user instruction)
 - Dark mode is default, light mode is secondary.
+- Navbar readable states are explicit: dark hover uses `rgba(99,102,241,0.12)` with `#E8E8F0`; light hover uses `#EEF2FF` with `#4338CA`.
+- Global placeholder styling lives in src/index.css and uses muted theme-specific colors with `opacity: 1`.
+- Cable medium plates are 5kg each; cable total weight is `(big * 7) + (medium * 5) + (small * 2.3)`.
+- New cable payload shape is `{ big, medium, small, reps }`; compatibility helpers should remain until old rows have been migrated.
 - `getLocalDate()` / `todayStr()` local-date utilities are required for app date comparisons; do not use UTC date slicing for local-date behavior.
 - Date-only goal targets should be formatted by splitting `YYYY-MM-DD` into local date parts, not by UTC parsing.
 - Masters research provider calls live in Supabase Edge Function `masters-research`; never put Gemini/service-role secrets in Vite browser code.
@@ -78,23 +86,25 @@ None - see Queued Next.
 - Non-local hosts load Google Fonts and Tabler Icons from CDN. Localhost uses the `html.local-assets` fallback to keep browser QA usable when external resources are blocked.
 
 ## Unresolved Issues
-- DB migration must be run manually in Supabase SQL editor before the workout_type feature works. Migration SQL is in supabase_setup.sql (commented out statements at the bottom).
+- Cable payload migration must be run manually in Supabase SQL editor. Migration SQL is at the bottom of supabase_setup.sql.
+- DB migration for workout_type may still need to be run manually in Supabase SQL editor in environments that have not applied it yet. Migration SQL is in supabase_setup.sql (commented statements near the bottom).
 - Phase 3b Masters SQL must be run manually in Supabase SQL editor before `/masters` can load live country/university data in production.
-- Repeated live research can exhaust Gemini free-tier quota (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, limit 20 for `gemini-2.5-flash` on the tested key). The UI now surfaces a friendly quota message and keeps existing reports unchanged.
+- Repeated live research can exhaust Gemini free-tier quota (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, limit 20 for `gemini-2.5-flash` on the tested key). The UI surfaces a friendly quota message and keeps existing reports unchanged.
 - Local browser review on 2026-07-09 reached Supabase with network approval but the configured database returned 0 countries and 0 universities, so report-page presentation polish still needs live data or reseeding.
 
 ## Files Changed This Session
-- `src/lib/mastersResearch.js` - added friendly Masters research error normalization.
-- `src/components/MastersReportComponents.jsx` - added reusable `ReportNotice`.
-- `src/pages/Masters.jsx` - uses friendly research error messages in the main Masters workflow.
-- `src/pages/MastersCountryReport.jsx` - catches refresh failures, clears refresh loading, and shows inline notice.
-- `src/pages/MastersUniversityReport.jsx` - catches refresh failures, clears refresh loading, shows inline notice, and uses ASCII subtitle separator.
-- `qa_reports/qa_20260709_masters_quota_notice.md` - QA report for this change.
-- `qa_reports/code_quality_20260709_masters_quota_notice.md` - code-quality report for this change.
+- `src/index.css` - navbar readable states, global placeholder colors, and `.default-zero`.
+- `src/components/Navbar.jsx` - light/dark active underline color.
+- `src/components/ExerciseCard.jsx` - cable Big/Medium/Small inputs, validation, payload, PR/progressive overload, last-session display, legacy row normalization.
+- `src/components/HistoryDrawer.jsx` - cable Big/Medium/Small edit form, payload, history display, PR calculation, legacy row normalization.
+- `src/components/ProgressGraph.jsx` - cable formula and tooltip composition.
+- `supabase_setup.sql` - cable payload migration SQL.
+- `qa_reports/qa_20260713_quick_fixes_nav_placeholders_cable.md` - QA report.
+- `qa_reports/code_quality_20260713_quick_fixes_nav_placeholders_cable.md` - code-quality report.
 - `CLAUDE.md` - appended QA history entry.
 - `HANDOFF.md` - refreshed session handoff.
 
 ## QA Status
-Last QA run: 2026-07-09T01:28:28+05:30
-Pass rate: code-reading QA 7/7; browser QA 30/30; build passed
-Report: qa_reports/qa_20260709_masters_quota_notice.md
+Last QA run: 2026-07-13T14:00:58+05:30
+Pass rate: code-reading QA 10/10; browser QA 30/30; build passed
+Report: qa_reports/qa_20260713_quick_fixes_nav_placeholders_cable.md

@@ -17,8 +17,19 @@ function seriesColor(key) { return SERIES_COLORS[key] || '#6366F1' }
 
 function cableValue(set) {
   if (set == null) return null
-  if (set.plates !== undefined) return (set.plates || 0) * 7 + (set.mini || 0) * 2.3
+  if (set.big !== undefined || set.plates !== undefined) {
+    return (set.big ?? set.plates ?? 0) * 7 + (set.medium || 0) * 5 + (set.small ?? set.mini ?? 0) * 2.3
+  }
   return set.weight || 0
+}
+
+function formatCableParts(set) {
+  return `${set.big ?? set.plates ?? 0} big + ${set.medium || 0} medium + ${set.small ?? set.mini ?? 0} small`
+}
+
+function formatCableCompact(set, value, includeReps = false) {
+  const reps = includeReps ? ` × ${set.reps}` : ''
+  return `${value}kg (${formatCableParts(set)})${reps}`
 }
 
 function getSeriesValue(sets, key, wt) {
@@ -106,11 +117,11 @@ function formatTooltipValue(value, key, session, wt) {
       const best = (session.sets || []).reduce((b, s) => {
         const v = cableValue(s); return (v != null && (b == null || v > cableValue(b))) ? s : b
       }, null)
-      if (best?.plates !== undefined) return `P${best.plates} M${best.mini} (≈${value})`
+      if (best?.big !== undefined || best?.plates !== undefined) return formatCableCompact(best, value)
     } else {
       const idx = parseInt(key.replace('set', ''))
       const s = session.sets?.[idx]
-      if (s?.plates !== undefined) return `P${s.plates} M${s.mini} (≈${value})`
+      if (s?.big !== undefined || s?.plates !== undefined) return formatCableCompact(s, value)
     }
     return String(value)
   }
@@ -141,11 +152,11 @@ function formatCombinedEntry(key, val, session, wt, viewMode) {
       const best = sets.reduce((b, s) => {
         const v = cableValue(s); return (v != null && (b == null || v > cableValue(b))) ? s : b
       }, null)
-      return best?.plates !== undefined ? `P${best.plates} M${best.mini} × ${best.reps}` : `${val}`
+      return (best?.big !== undefined || best?.plates !== undefined) ? formatCableCompact(best, val, true) : `${val}`
     }
     const idx = parseInt(key.replace('set', ''))
     const s = sets[idx]
-    return s?.plates !== undefined ? `P${s.plates} M${s.mini} × ${s.reps}` : `${val}`
+    return (s?.big !== undefined || s?.plates !== undefined) ? formatCableCompact(s, val, true) : `${val}`
   }
 
   if (wt === 'time') {
@@ -201,7 +212,7 @@ export default function ProgressGraph({ exercise, logs, onClose }) {
     const s = sets?.[pos]
     if (!s) return null
     if (wt === 'barbell' || wt === 'dumbbell') return s.weight || 0
-    if (wt === 'cable') return (s.plates || 0) * 7 + (s.mini || 0) * 2.3
+    if (wt === 'cable') return cableValue(s)
     if (wt === 'reps') return s.reps || 0
     if (wt === 'time') return s.duration || 0
     return null

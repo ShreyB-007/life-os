@@ -239,3 +239,30 @@ create policy "anon_all_exercise_logs" on exercise_logs for all to anon using (t
 -- ALTER TABLE exercise_logs
 -- ADD CONSTRAINT exercise_logs_exercise_id_log_date_workout_type_key
 -- UNIQUE (exercise_id, log_date, workout_type);
+
+-- ============================================================
+-- Migration: cable exercise plate shape
+-- Converts old sets payloads:
+--   { "plates": 3, "mini": 1, "reps": 10 }
+-- to:
+--   { "big": 3, "medium": 0, "small": 1, "reps": 10 }
+-- Run once in the Supabase SQL editor after deploying the matching frontend.
+-- ============================================================
+
+UPDATE exercise_logs
+SET sets = (
+  SELECT jsonb_agg(
+    CASE
+      WHEN s ? 'plates' THEN
+        jsonb_build_object(
+          'big', COALESCE((s->>'plates')::int, 0),
+          'medium', 0,
+          'small', COALESCE((s->>'mini')::int, 0),
+          'reps', COALESCE((s->>'reps')::int, 0)
+        )
+      ELSE s
+    END
+  )
+  FROM jsonb_array_elements(sets) s
+)
+WHERE sets::text LIKE '%"plates"%';

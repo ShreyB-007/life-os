@@ -164,6 +164,21 @@ html.dark {
   input[type='checkbox'] {
     accent-color: #6366F1;
   }
+
+  ::placeholder {
+    color: #4A4A60 !important;
+    opacity: 1;
+  }
+
+  .dark ::placeholder {
+    color: #4A4A60 !important;
+    opacity: 1;
+  }
+
+  html:not(.dark) ::placeholder {
+    color: #AAAABC !important;
+    opacity: 1;
+  }
 }
 
 html.local-assets .ti {
@@ -378,29 +393,37 @@ html.dark .gym-rest-btn {
 /* ─── Navbar link — L→R color wash on hover ─────────── */
 .nav-link-hover {
   border-radius: 6px;
+  color: #71717A;
+  transition: color 150ms ease, background-color 150ms ease;
 }
 
 .nav-link-wash {
-  background: linear-gradient(90deg, var(--os-fg) 0%, var(--os-fg) 50%, var(--os-secondary) 50%, var(--os-secondary) 100%);
-  background-size: 201%;
-  background-position: 100% 0;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  transition: background-position 280ms ease, box-shadow 150ms ease;
   position: relative;
 }
 
-.nav-link-wash:hover {
-  background-position: 0% 0;
+html.dark .nav-link-hover {
+  color: #B0B0C8;
+}
+
+.nav-link-hover:hover,
+.nav-link-hover:focus-visible {
+  background: #EEF2FF;
+  color: #4338CA;
+  outline: none;
+}
+
+html.dark .nav-link-hover:hover,
+html.dark .nav-link-hover:focus-visible {
+  background: rgba(99, 102, 241, 0.12);
+  color: #E8E8F0;
 }
 
 .nav-link-wash.is-active {
-  background-position: 0% 0;
+  color: #4338CA;
 }
 
-.nav-link-wash:hover {
-  box-shadow: none;
+html.dark .nav-link-wash.is-active {
+  color: #E8E8F0;
 }
 
 .masters-tree-row {
@@ -415,19 +438,6 @@ html.dark .gym-rest-btn {
 
 .masters-tree-row:hover,
 .masters-tree-row.is-selected {
-  background: rgba(99, 102, 241, 0.08);
-}
-
-/* Nav hover background pill */
-.nav-link-hover {
-  transition: background-color 150ms ease;
-}
-
-.nav-link-hover:hover {
-  background: rgba(99, 102, 241, 0.07);
-}
-
-html.dark .nav-link-hover:hover {
   background: rgba(99, 102, 241, 0.08);
 }
 
@@ -506,6 +516,10 @@ html.dark .nav-link-hover:hover {
 
 .drawer-input:focus {
   border-color: rgba(99, 102, 241, 0.5);
+}
+
+.drawer-input.default-zero {
+  color: #4A4A60 !important;
 }
 
 .drawer-input::-webkit-inner-spin-button,
