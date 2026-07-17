@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
-import { todayStr } from '../lib/date'
 import { getLocalDateString } from '../lib/dateUtils'
 import { ALL_WORKOUT_TYPES } from '../lib/exercise'
 
@@ -195,9 +194,9 @@ function getDaysStyle(days) {
 export default function ExerciseCard({
   exercise, logs, allLogs = [], expanded, onToggle, onCollapse,
   onLogSave, onOpenGraph, onDeleteToday, onRemoveExercise, onAddTag,
-  workoutType, viewOnly = false,
+  workoutType, selectedDate, viewOnly = false,
 }) {
-  const today = todayStr()
+  const today = selectedDate
   const wt    = exercise.weight_type
 
   const todayLog   = logs.find(l => l.log_date === today) ?? null
@@ -238,7 +237,7 @@ export default function ExerciseCard({
     setFocusedDefaultZeros(new Set())
     setSubmitAttempted(false)
     setComparisonActive(false)
-  }, [todayLog?.log_date])
+  }, [todayLog?.log_date, selectedDate, wt])
 
   // Collapsing without saving should drop the live-preview PR badge — otherwise an
   // abandoned edit that briefly looked like a PR keeps showing in the collapsed header.
@@ -270,7 +269,7 @@ export default function ExerciseCard({
       const m = priorLogs.reduce((acc, l) => Math.max(acc, getMaxFromLog(l, wt)), 0)
       setPriorMax(m)
     }
-  }, [expanded])
+  }, [expanded, logs, today, wt])
 
   // Live PR detection — debounced 300ms, runs on every input change
   useEffect(() => {
@@ -584,7 +583,7 @@ export default function ExerciseCard({
         {todayLog && (
           <button onClick={() => onDeleteToday()} className="action-pill-btn action-pill-red">
             <i className="ti ti-trash" />
-            Delete today
+            Delete selected date
           </button>
         )}
         {(exercise.workout_type_tags || []).length > 1 && (
@@ -799,7 +798,7 @@ export default function ExerciseCard({
               color: 'white',
             }}
           >
-            {saving ? 'Saving…' : viewOnly ? 'Logged in another category today' : saved ? '✓ Logged' : showBlockStyle ? 'Fix errors above' : 'Log workout'}
+            {saving ? 'Saving...' : viewOnly ? 'Logged in another category on selected date' : saved ? 'Logged' : showBlockStyle ? 'Fix errors above' : 'Log workout'}
           </button>
         </div>
       )}

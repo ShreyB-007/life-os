@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { todayStr } from '../lib/date'
+import { getLocalDate } from '../lib/dateUtils'
 import { computeStreak, computeOverallStreak } from '../lib/streaks'
 import TopBar from '../components/TopBar'
 import AllDoneBanner from '../components/AllDoneBanner'
@@ -14,8 +14,8 @@ import NeuralConstellation from '../components/NeuralConstellation'
 export default function Dashboard() {
   const [logs, setLogs] = useState({ gym: [], japanese: [], dsa: [] })
   const [todayLogs, setTodayLogs] = useState({ gym: null, japanese: null, dsa: null })
+  const [selectedDate, setSelectedDate] = useState(getLocalDate())
   const [goals, setGoals] = useState([])
-  const initialized = useRef(false)
   const constellationRef = useRef(null)
   const gymCardRef = useRef(null)
   const japaneseCardRef = useRef(null)
@@ -25,9 +25,16 @@ export default function Dashboard() {
     fetchAll()
   }, [])
 
-  async function fetchAll() {
-    const today = todayStr()
+  useEffect(() => {
+    const today = getLocalDate()
+    if (selectedDate > today) {
+      setSelectedDate(today)
+      return
+    }
+    loadLogsForDate(selectedDate)
+  }, [selectedDate])
 
+  async function fetchAll() {
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - 400)
     const y = cutoff.getFullYear(), mo = String(cutoff.getMonth()+1).padStart(2,'0'), d = String(cutoff.getDate()).padStart(2,'0')
@@ -50,39 +57,57 @@ export default function Dashboard() {
 
       setLogs({ gym: gymLogs, japanese: japaneseLogs, dsa: dsaLogs })
       setTodayLogs({
-        gym: gymLogs.find(l => l.log_date === today) ?? null,
-        japanese: japaneseLogs.find(l => l.log_date === today) ?? null,
-        dsa: dsaLogs.find(l => l.log_date === today) ?? null,
+        gym: gymLogs.find(l => l.log_date === selectedDate) ?? null,
+        japanese: japaneseLogs.find(l => l.log_date === selectedDate) ?? null,
+        dsa: dsaLogs.find(l => l.log_date === selectedDate) ?? null,
       })
     }
 
     if (goalsRes.data) setGoals(goalsRes.data)
-    initialized.current = true
+  }
+
+  async function loadLogsForDate(date) {
+    const { data } = await supabase
+      .from('habit_logs')
+      .select('*')
+      .in('habit_key', ['gym', 'japanese', 'dsa'])
+      .eq('log_date', date)
+
+    const newTodayLogs = { gym: null, japanese: null, dsa: null }
+    data?.forEach(log => {
+      newTodayLogs[log.habit_key] = log
+    })
+    setTodayLogs(newTodayLogs)
   }
 
   // Called by each card after every log operation (optimistic).
-  // Replaces today's entry in logs[] and updates todayLogs.
+  // Replaces the selected date's entry in logs[] and updates todayLogs.
   function onLog(habitKey, logEntry) {
     const date = logEntry.log_date
     const cardRefs = { gym: gymCardRef, japanese: japaneseCardRef, dsa: dsaCardRef }
 
-    setTodayLogs(prev => {
-      const wasAlreadyDone =
-        prev[habitKey]?.done === true || prev[habitKey]?.is_rest_day === true
-      const nowDone = logEntry.done === true || logEntry.is_rest_day === true
-      if (nowDone && !wasAlreadyDone) {
-        // Pulse fires after state update so the card el is correct
-        setTimeout(() => {
-          constellationRef.current?.triggerPulse(cardRefs[habitKey]?.current)
-        }, 0)
-      }
-      return { ...prev, [habitKey]: logEntry }
-    })
+    if (date === selectedDate) {
+      setTodayLogs(prev => {
+        const wasAlreadyDone =
+          prev[habitKey]?.done === true || prev[habitKey]?.is_rest_day === true
+        const nowDone = logEntry.done === true || logEntry.is_rest_day === true
+        if (nowDone && !wasAlreadyDone) {
+          // Pulse fires after state update so the card el is correct
+          setTimeout(() => {
+            constellationRef.current?.triggerPulse(cardRefs[habitKey]?.current)
+          }, 0)
+        }
+        return { ...prev, [habitKey]: logEntry }
+      })
+    }
 
-    setLogs(prev => ({
-      ...prev,
-      [habitKey]: [logEntry, ...prev[habitKey].filter(l => l.log_date !== date)],
-    }))
+    setLogs(prev => {
+      const existing = prev[habitKey] ?? []
+      return {
+        ...prev,
+        [habitKey]: sortLogsDesc([logEntry, ...existing.filter(l => l.log_date !== date)])
+      }
+    })
   }
 
   const gymStreak = computeStreak(logs.gym, [0])
@@ -95,17 +120,42 @@ export default function Dashboard() {
     (todayLogs.gym?.done === true || todayLogs.gym?.is_rest_day === true) &&
     todayLogs.japanese?.done === true &&
     todayLogs.dsa?.done === true
+  const isViewingToday = selectedDate === getLocalDate()
 
   return (
     <div className="max-w-[1200px] mx-auto px-6 py-8">
       <NeuralConstellation ref={constellationRef} allDone={allDone} />
-      <TopBar overallStreak={overallStreak} />
+      <TopBar
+        overallStreak={overallStreak}
+        selectedDate={selectedDate}
+        onSelectedDateChange={setSelectedDate}
+      />
 
-      <AllDoneBanner visible={allDone} />
+      {!isViewingToday && (
+        <div
+          className="mb-4 flex items-center justify-between gap-3 rounded-lg px-4 py-2 text-xs font-body"
+          style={{
+            background: 'rgba(245,158,11,0.12)',
+            border: '1px solid rgba(245,158,11,0.28)',
+            color: '#F59E0B',
+          }}
+        >
+          <span>Viewing {formatSelectedDate(selectedDate)} - changes will be saved for that date</span>
+          <button
+            onClick={() => setSelectedDate(getLocalDate())}
+            className="font-semibold hover:opacity-80 transition-opacity"
+            type="button"
+          >
+            x Back to today
+          </button>
+        </div>
+      )}
+
+      <AllDoneBanner visible={allDone} selectedDate={selectedDate} />
 
       <div className="mb-6">
         <p className="text-[11px] font-body font-semibold uppercase tracking-widest mb-3" style={{ color: '#4A4A60' }}>
-          Today's check-ins
+          {isViewingToday ? "Today's check-ins" : `${formatSelectedDate(selectedDate)} check-ins`}
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <GymCard
@@ -113,6 +163,7 @@ export default function Dashboard() {
             streak={gymStreak}
             todayLog={todayLogs.gym}
             allLogs={logs.gym}
+            selectedDate={selectedDate}
             onLog={onLog}
           />
           <JapaneseCard
@@ -120,6 +171,7 @@ export default function Dashboard() {
             streak={japaneseStreak}
             todayLog={todayLogs.japanese}
             allLogs={logs.japanese}
+            selectedDate={selectedDate}
             onLog={onLog}
           />
           <DSACard
@@ -127,6 +179,7 @@ export default function Dashboard() {
             streak={dsaStreak}
             todayLog={todayLogs.dsa}
             allLogs={logs.dsa}
+            selectedDate={selectedDate}
             onLog={onLog}
           />
         </div>
@@ -136,4 +189,16 @@ export default function Dashboard() {
       <BottomRow goals={goals} />
     </div>
   )
+}
+
+function formatSelectedDate(dateStr) {
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+function sortLogsDesc(entries) {
+  return [...entries].sort((a, b) => b.log_date.localeCompare(a.log_date))
 }

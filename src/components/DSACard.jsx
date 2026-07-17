@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, forwardRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { getLocalDate } from '../lib/dateUtils'
 import StreakDisplay from './StreakDisplay'
 import DSAProgressGraph from './DSAProgressGraph'
 
@@ -10,7 +9,7 @@ const DIFFICULTIES = [
   { key: 'hard', label: 'Hard', color: '#EF4444' },
 ]
 
-const DSACard = forwardRef(function DSACard({ streak, todayLog, allLogs = [], onLog }, ref) {
+const DSACard = forwardRef(function DSACard({ streak, todayLog, allLogs = [], selectedDate, onLog }, ref) {
   const [counts, setCounts] = useState({ easy: 0, med: 0, hard: 0 })
   const [prevDone, setPrevDone] = useState(false)
   const [booped, setBooped] = useState(false)
@@ -28,7 +27,7 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, allLogs = [], on
       setCounts(empty)
       countsRef.current = empty
     }
-  }, [todayLog])
+  }, [todayLog, selectedDate])
 
   const total = counts.easy + counts.med + counts.hard
   const isDone = total > 0
@@ -48,7 +47,7 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, allLogs = [], on
     const totalQuestions = next.easy + next.med + next.hard
     const logEntry = {
       habit_key: 'dsa',
-      log_date: getLocalDate(),
+      log_date: selectedDate,
       done: totalQuestions > 0,
       is_rest_day: false,
       payload: { easy: next.easy, med: next.med, hard: next.hard },

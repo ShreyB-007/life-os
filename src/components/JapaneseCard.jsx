@@ -1,6 +1,5 @@
 import { useState, useEffect, forwardRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { todayStr } from '../lib/date'
 import { computeSubtaskStreak } from '../lib/streaks'
 import StreakDisplay from './StreakDisplay'
 
@@ -10,7 +9,7 @@ const SUBTASKS = [
   { key: 'study', label: 'Study session' },
 ]
 
-const JapaneseCard = forwardRef(function JapaneseCard({ streak, todayLog, allLogs, onLog }, ref) {
+const JapaneseCard = forwardRef(function JapaneseCard({ streak, todayLog, allLogs, selectedDate, onLog }, ref) {
   const [checked, setChecked] = useState({ anki: false, duolingo: false, study: false })
   const [prevDone, setPrevDone] = useState(false)
   const [booped, setBooped] = useState(false)
@@ -18,8 +17,10 @@ const JapaneseCard = forwardRef(function JapaneseCard({ streak, todayLog, allLog
   useEffect(() => {
     if (todayLog?.payload?.subtasks) {
       setChecked(todayLog.payload.subtasks)
+    } else {
+      setChecked({ anki: false, duolingo: false, study: false })
     }
-  }, [todayLog])
+  }, [todayLog, selectedDate])
 
   const doneCount = Object.values(checked).filter(Boolean).length
   const isDone = doneCount >= 2
@@ -41,7 +42,7 @@ const JapaneseCard = forwardRef(function JapaneseCard({ streak, todayLog, allLog
     const newDone = Object.values(next).filter(Boolean).length >= 2
     const logEntry = {
       habit_key: 'japanese',
-      log_date: todayStr(),
+      log_date: selectedDate,
       done: newDone,
       is_rest_day: false,
       payload: { subtasks: next },

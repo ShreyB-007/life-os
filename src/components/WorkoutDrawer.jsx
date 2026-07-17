@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { todayStr } from '../lib/date'
-import { getLocalDate } from '../lib/dateUtils'
 import { normalizeExerciseName } from '../lib/exercise'
 import ExerciseCard from './ExerciseCard'
 import AddExerciseModal from './AddExerciseModal'
@@ -11,7 +9,7 @@ import ProgressGraph from './ProgressGraph'
 const WORKOUT_EMOJIS = { Push: '💪', Pull: '🏋️', Legs: '🦵', Cardio: '🏃' }
 
 
-export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitConfirmed, onClose, onDone, onDeleteSession, onResetGymHabit, onFirstExerciseLogged, onTransferComplete }) {
+export default function WorkoutDrawer({ workoutType, selectedDate, fromType, viewOnly, habitConfirmed, onClose, onDone, onDeleteSession, onResetGymHabit, onFirstExerciseLogged, onTransferComplete }) {
   const [exercises, setExercises]             = useState([])
   const [logs, setLogs]                       = useState({})
   const [allLogs, setAllLogs]                 = useState({})
@@ -45,7 +43,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
 
   useEffect(() => {
     if (fromType) checkForTransfer()
-  }, [fromType])
+  }, [fromType, selectedDate])
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -124,7 +122,6 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
   }
 
   async function checkForTransfer() {
-    const today = todayStr()
     const { data: fromExs } = await supabase
       .from('exercises')
       .select('id')
@@ -135,7 +132,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
       .from('exercise_logs')
       .select('id')
       .in('exercise_id', fromExs.map(e => e.id))
-      .eq('log_date', today)
+      .eq('log_date', selectedDate)
       .eq('workout_type', fromType)
 
     if (fromLogs?.length) setShowTransferBanner(true)
@@ -143,14 +140,13 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
 
   async function handleTransfer() {
     setTransferring(true)
-    const today = getLocalDate()
 
     try {
-      // Step 1: fetch today's exercise_logs for fromType, joining exercise data.
+      // Step 1: fetch the selected date's exercise_logs for fromType, joining exercise data.
       const { data: sourceLogs, error: fetchErr } = await supabase
         .from('exercise_logs')
         .select('*, exercises(*)')
-        .eq('log_date', today)
+        .eq('log_date', selectedDate)
         .eq('workout_type', fromType)
 
       if (fetchErr) throw fetchErr
@@ -173,7 +169,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
           .from('exercise_logs')
           .upsert({
             exercise_id: exercise.id,
-            log_date: today,
+            log_date: selectedDate,
             workout_type: workoutType,
             sets: log.sets,
             is_pr: log.is_pr,
@@ -187,7 +183,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
         .from('exercise_logs')
         .delete()
         .in('exercise_id', sourceExerciseIds)
-        .eq('log_date', today)
+        .eq('log_date', selectedDate)
         .eq('workout_type', fromType)
 
       if (deleteErr) {
@@ -225,7 +221,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
       // Step 6: update habit_logs payload to toType and refresh local state.
       await supabase.from('habit_logs').upsert({
         habit_key: 'gym',
-        log_date: today,
+        log_date: selectedDate,
         done: true,
         is_rest_day: false,
         payload: { workout_type: workoutType },
@@ -249,13 +245,16 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
     )
     setLogs(prev => ({
       ...prev,
-      [exerciseId]: [entry, ...(prev[exerciseId] || []).filter(l => l.log_date !== entry.log_date)],
+      [exerciseId]: sortLogsDesc([entry, ...(prev[exerciseId] || []).filter(l => l.log_date !== entry.log_date)]),
     }))
     setAllLogs(prev => ({
       ...prev,
-      [exerciseId]: [entry, ...(prev[exerciseId] || []).filter(l => !(l.log_date === entry.log_date && l.workout_type === entry.workout_type))],
+      [exerciseId]: sortLogsDesc([
+        entry,
+        ...(prev[exerciseId] || []).filter(l => !(l.log_date === entry.log_date && l.workout_type === entry.workout_type)),
+      ]),
     }))
-    if ((!alreadyHadTodaySession || !habitConfirmed) && entry.log_date === getLocalDate()) {
+    if ((!alreadyHadTodaySession || !habitConfirmed) && entry.log_date === selectedDate) {
       onFirstExerciseLogged?.(workoutType)
     }
   }
@@ -290,18 +289,17 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
   }
 
   async function handleDeleteToday(exercise) {
-    const today = todayStr()
-    const updatedLogs = (logs[exercise.id] || []).filter(l => l.log_date !== today)
+    const updatedLogs = (logs[exercise.id] || []).filter(l => l.log_date !== selectedDate)
 
-    // Check before state update: will any other exercise still have a today's session?
+    // Check before state update: will any other exercise still have a selected-date session?
     const otherHaveToday = exercises.some(ex =>
-      ex.id !== exercise.id && (logs[ex.id] || []).some(l => l.log_date === today)
+      ex.id !== exercise.id && (logs[ex.id] || []).some(l => l.log_date === selectedDate)
     )
 
-    // Delete today's log for this exercise in this category only
+    // Delete the selected date's log for this exercise in this category only
     await supabase.from('exercise_logs').delete()
       .eq('exercise_id', exercise.id)
-      .eq('log_date', today)
+      .eq('log_date', selectedDate)
       .eq('workout_type', workoutType)
 
     if (updatedLogs.length === 0) {
@@ -325,7 +323,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
       setLogs(prev => ({ ...prev, [exercise.id]: updatedLogs }))
       setAllLogs(prev => ({
         ...prev,
-        [exercise.id]: (prev[exercise.id] || []).filter(l => !(l.log_date === today && l.workout_type === workoutType)),
+        [exercise.id]: (prev[exercise.id] || []).filter(l => !(l.log_date === selectedDate && l.workout_type === workoutType)),
       }))
     }
 
@@ -353,16 +351,15 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
       setRemoveExTarget({ exercise, bodyText, isMultiTag: true })
     } else {
       // Case B: exercise only exists in this category — full delete
-      const today = todayStr()
       const localLogs = logs[exercise.id] || []
-      let priorCount = localLogs.filter(l => l.log_date < today).length
+      let priorCount = localLogs.filter(l => l.log_date < selectedDate).length
 
       if (priorCount === 0) {
         const { data: dbPrior } = await supabase
           .from('exercise_logs')
           .select('id')
           .eq('exercise_id', exercise.id)
-          .lt('log_date', today)
+          .lt('log_date', selectedDate)
         priorCount = Array.isArray(dbPrior) ? dbPrior.length : 0
       }
 
@@ -378,11 +375,10 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
     const { exercise, isMultiTag } = removeExTarget
 
     if (isMultiTag) {
-      const today = todayStr()
-      // Check before mutations: did this exercise have a log today, and do any others?
-      const hadToday = (logs[exercise.id] || []).some(l => l.log_date === today)
+      // Check before mutations: did this exercise have a log for selectedDate, and do any others?
+      const hadToday = (logs[exercise.id] || []).some(l => l.log_date === selectedDate)
       const otherHaveToday = exercises.some(ex =>
-        ex.id !== exercise.id && (logs[ex.id] || []).some(l => l.log_date === today)
+        ex.id !== exercise.id && (logs[ex.id] || []).some(l => l.log_date === selectedDate)
       )
 
       // Case A: delete only this category's logs and remove from tags
@@ -438,14 +434,13 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
   async function handleDeleteTodaySession() {
     if (deletingSession) return
     setDeletingSession(true)
-    const today = todayStr()
 
     for (const ex of exercises) {
-      const todayLog = (logs[ex.id] || []).find(l => l.log_date === today)
+      const todayLog = (logs[ex.id] || []).find(l => l.log_date === selectedDate)
       if (!todayLog) continue
 
       // logs[] is filtered by workoutType, so priorLogs is per-category
-      const priorLogs = (logs[ex.id] || []).filter(l => l.log_date < today)
+      const priorLogs = (logs[ex.id] || []).filter(l => l.log_date < selectedDate)
       const isMultiTag = (ex.workout_type_tags || []).length > 1
 
       if (priorLogs.length === 0 && !isMultiTag) {
@@ -459,15 +454,15 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
         // Has prior history OR exists in other categories: only delete today's log for this type
         await supabase.from('exercise_logs').delete()
           .eq('exercise_id', ex.id)
-          .eq('log_date', today)
+          .eq('log_date', selectedDate)
           .eq('workout_type', workoutType)
         setLogs(prev => ({
           ...prev,
-          [ex.id]: (prev[ex.id] || []).filter(l => l.log_date !== today),
+          [ex.id]: (prev[ex.id] || []).filter(l => l.log_date !== selectedDate),
         }))
         setAllLogs(prev => ({
           ...prev,
-          [ex.id]: (prev[ex.id] || []).filter(l => !(l.log_date === today && l.workout_type === workoutType)),
+          [ex.id]: (prev[ex.id] || []).filter(l => !(l.log_date === selectedDate && l.workout_type === workoutType)),
         }))
       }
     }
@@ -495,8 +490,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
     setTimeout(() => setToast(null), 3000)
   }
 
-  const today = todayStr()
-  const hasTodaySession = exercises.some(ex => (logs[ex.id] || []).some(l => l.log_date === today))
+  const hasTodaySession = exercises.some(ex => (logs[ex.id] || []).some(l => l.log_date === selectedDate))
 
   return (
     <>
@@ -574,7 +568,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
             <div className="mx-4 mt-3 flex-shrink-0 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-body text-os-secondary flex-1">
-                  ↔️ You have a <span className="font-semibold text-os-fg">{fromType}</span> session from today. Move it here?
+                  You have a <span className="font-semibold text-os-fg">{fromType}</span> session on the selected date. Move it here?
                 </p>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button
@@ -616,6 +610,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
                   exercise={ex}
                   logs={logs[ex.id] || []}
                   allLogs={allLogs[ex.id] || []}
+                  selectedDate={selectedDate}
                   expanded={expandedId === ex.id}
                   onToggle={() => setExpandedId(prev => prev === ex.id ? null : ex.id)}
                   onCollapse={() => setExpandedId(prev => prev === ex.id ? null : prev)}
@@ -640,7 +635,7 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
                 className="w-full py-2 rounded-lg text-sm font-body font-medium transition-all disabled:opacity-50"
                 style={{ border: '1px solid rgba(239,68,68,0.4)', color: '#EF4444', background: 'rgba(239,68,68,0.06)' }}
               >
-                {deletingSession ? 'Deleting…' : '🗑️ Delete today\'s session'}
+                {deletingSession ? 'Deleting...' : 'Delete selected date session'}
               </button>
             )}
             <div className="flex gap-3">
@@ -701,4 +696,8 @@ export default function WorkoutDrawer({ workoutType, fromType, viewOnly, habitCo
       )}
     </>
   )
+}
+
+function sortLogsDesc(entries) {
+  return [...entries].sort((a, b) => b.log_date.localeCompare(a.log_date))
 }

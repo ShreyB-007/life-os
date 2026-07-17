@@ -397,6 +397,20 @@ html.dark .gym-rest-btn {
   transition: color 150ms ease, background-color 150ms ease;
 }
 
+.dashboard-date-selector,
+.dashboard-date-popover {
+  background: #FFFFFF;
+  border: 1px solid #E4E4E7;
+  box-shadow: 0 2px 16px rgba(100, 100, 180, 0.08);
+}
+
+html.dark .dashboard-date-selector,
+html.dark .dashboard-date-popover {
+  background: #0F0F1A;
+  border-color: #1C1C2E;
+  box-shadow: none;
+}
+
 .nav-link-wash {
   position: relative;
 }

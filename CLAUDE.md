@@ -291,3 +291,4 @@ Report: qa_reports/[filename]
 - 2026-07-09: Masters provider quota notice and refresh failure handling - code-reading QA 7/7 passed; browser QA 30/30 passed; build passed
 - 2026-07-13: Navbar contrast, placeholder/default-zero styling, and cable medium plate support - code-reading QA 10/10 passed; browser QA 30/30 passed; build passed
 - 2026-07-17: Masters add-country frontend diagnosis and setup-error surfacing - focused QA 38/39 passed with 1 live E2E item blocked by Supabase RLS/seed repair; browser QA 30/30 passed; build passed
+- 2026-07-17: Dashboard selected-date logging and calendar picker - focused QA 20/20 passed; browser QA 30/30 passed; build passed

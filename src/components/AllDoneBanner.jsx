@@ -1,5 +1,12 @@
-export default function AllDoneBanner({ visible }) {
+import { getLocalDate } from '../lib/dateUtils'
+
+export default function AllDoneBanner({ visible, selectedDate }) {
   if (!visible) return null
+
+  const isToday = selectedDate === getLocalDate()
+  const message = isToday
+    ? "All habits done - you're locked in"
+    : `All habits done on ${formatShortDate(selectedDate)}!`
 
   return (
     <div
@@ -16,11 +23,19 @@ export default function AllDoneBanner({ visible }) {
         <div className="flex items-center justify-center gap-2.5">
           <i className="ti ti-lock text-emerald-400 text-base" />
           <span className="font-display font-semibold text-sm tracking-wide text-gradient-cosmic">
-            All habits done — you're locked in
+            {message}
           </span>
           <i className="ti ti-lock text-emerald-400 text-base" />
         </div>
       </div>
     </div>
   )
+}
+
+function formatShortDate(dateStr) {
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
 }

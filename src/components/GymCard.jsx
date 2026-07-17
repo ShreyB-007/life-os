@@ -1,6 +1,5 @@
 import { useState, useEffect, forwardRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { todayStr } from '../lib/date'
 import { getLocalDateString } from '../lib/dateUtils'
 import StreakDisplay from './StreakDisplay'
 import WorkoutDrawer from './WorkoutDrawer'
@@ -13,15 +12,20 @@ const WORKOUT_TYPES = [
   { key: 'Cardio', subtitle: 'Endurance' },
 ]
 
-function getMondayStr() {
-  const today = new Date()
-  const daysToMonday = (today.getDay() + 6) % 7
-  const monday = new Date(today)
-  monday.setDate(today.getDate() - daysToMonday)
-  return getLocalDateString(monday)
+function getWeekBounds(dateStr) {
+  const selected = new Date(`${dateStr}T00:00:00`)
+  const daysToMonday = (selected.getDay() + 6) % 7
+  const monday = new Date(selected)
+  monday.setDate(selected.getDate() - daysToMonday)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  return {
+    mondayStr: getLocalDateString(monday),
+    sundayStr: getLocalDateString(sunday),
+  }
 }
 
-const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], onLog }, ref) {
+const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], selectedDate, onLog }, ref) {
   const [selected, setSelected]                  = useState(null)
   const [isRest, setIsRest]                      = useState(false)
   const [saving, setSaving]                      = useState(false)
@@ -54,7 +58,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
       setIsRest(false)
       setLocallyConfirmedType(null)
     }
-  }, [todayLog])
+  }, [todayLog, selectedDate])
 
   const confirmedWorkoutType =
     todayLog?.done && todayLog.payload?.workout_type && todayLog.payload.workout_type !== 'rest'
@@ -62,14 +66,14 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
       : locallyConfirmedType
   const isDone = Boolean(confirmedWorkoutType) || isRest
 
-  const mondayStr = getMondayStr()
-  const weekRestCount = allLogs.filter(l => l.is_rest_day && l.log_date >= mondayStr).length
+  const { mondayStr, sundayStr } = getWeekBounds(selectedDate)
+  const weekRestCount = allLogs.filter(l => l.is_rest_day && l.log_date >= mondayStr && l.log_date <= sundayStr).length
   const restLimitReached = weekRestCount >= 2
 
   async function save(workoutType, restDay, done) {
     const logEntry = {
       habit_key: 'gym',
-      log_date: todayStr(),
+      log_date: selectedDate,
       done,
       is_rest_day: restDay,
       payload: workoutType ? { workout_type: workoutType } : {},
@@ -102,7 +106,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
           .from('exercise_logs')
           .select('id')
           .in('exercise_id', exs.map(e => e.id))
-          .eq('log_date', todayStr())
+          .eq('log_date', selectedDate)
           .limit(1)
         if (todayExLogs?.length) {
           setDrawerWorkoutType(type)
@@ -150,10 +154,9 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     save(null, false, false)
   }
 
-  // Deletes today's exercise_logs for the given workout type (with no-prior-history
+  // Deletes the selected date's exercise_logs for the given workout type (with no-prior-history
   // cleanup), mirroring WorkoutDrawer's handleDeleteTodaySession.
   async function deleteTodaysSessionForType(workoutType) {
-    const today = todayStr()
     const { data: exs } = await supabase
       .from('exercises')
       .select('id')
@@ -164,7 +167,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
       .from('exercise_logs')
       .select('id, exercise_id')
       .in('exercise_id', exs.map(e => e.id))
-      .eq('log_date', today)
+      .eq('log_date', selectedDate)
     if (!todayExLogs?.length) return
 
     for (const log of todayExLogs) {
@@ -172,7 +175,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
         .from('exercise_logs')
         .select('id')
         .eq('exercise_id', log.exercise_id)
-        .lt('log_date', today)
+        .lt('log_date', selectedDate)
         .limit(1)
 
       if (!priorLogs?.length) {
@@ -246,7 +249,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
     // Propagate to Dashboard so todayLogs updates and GymCard's selected re-syncs via useEffect
     onLog('gym', {
       habit_key: 'gym',
-      log_date: todayStr(),
+      log_date: selectedDate,
       done: true,
       is_rest_day: false,
       payload: { workout_type: targetType },
@@ -358,6 +361,7 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], on
         <WorkoutDrawer
           key={drawerWorkoutType}
           workoutType={drawerWorkoutType}
+          selectedDate={selectedDate}
           fromType={drawerFromType}
           viewOnly={drawerViewOnly}
           habitConfirmed={isDone}
