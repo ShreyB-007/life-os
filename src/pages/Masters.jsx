@@ -17,6 +17,29 @@ import {
 
 const EMPTY_COUNTRY = { name: '', flag_emoji: '' }
 const EMPTY_UNIVERSITY = { name: '', city: '' }
+const MASTERS_SETUP_HINT = 'Run the Phase 3b Masters setup/repair SQL in Supabase, then reload this page.'
+
+function getSupabaseErrorMessage(action, error) {
+  if (!error) return `${action}.`
+  const detail = [error.message, error.details, error.hint].filter(Boolean).join(' ')
+  return `${action}: ${detail || 'Unknown Supabase error.'}`
+}
+
+function splitResearchTree(rows = []) {
+  const nextCountries = []
+  const nextUniversities = []
+
+  for (const row of rows) {
+    const { universities: nestedUniversities = [], ...country } = row
+    nextCountries.push(country)
+    for (const university of nestedUniversities) {
+      nextUniversities.push({ ...university, country_id: university.country_id ?? country.id })
+    }
+  }
+
+  nextUniversities.sort((a, b) => new Date(a.added_at ?? 0) - new Date(b.added_at ?? 0))
+  return { nextCountries, nextUniversities }
+}
 
 export default function Masters() {
   const navigate = useNavigate()
@@ -43,19 +66,20 @@ export default function Masters() {
     setLoading(true)
     setError('')
 
-    const [countriesRes, universitiesRes] = await Promise.all([
-      supabase.from('countries').select('*').order('added_at', { ascending: true }),
-      supabase.from('universities').select('*').order('added_at', { ascending: true }),
-    ])
+    const countriesRes = await supabase
+      .from('countries')
+      .select('*, universities(*)')
+      .order('added_at', { ascending: true })
 
-    if (countriesRes.error || universitiesRes.error) {
-      setError('Could not load Masters research data. Confirm the Phase 3b SQL has been run in Supabase.')
+    if (countriesRes.error) {
+      setError(`${getSupabaseErrorMessage('Could not load Masters research data', countriesRes.error)} ${MASTERS_SETUP_HINT}`)
       setLoading(false)
       return
     }
 
-    setCountries(countriesRes.data ?? [])
-    setUniversities(universitiesRes.data ?? [])
+    const { nextCountries, nextUniversities } = splitResearchTree(countriesRes.data ?? [])
+    setCountries(nextCountries)
+    setUniversities(nextUniversities)
     setLoading(false)
   }
 
@@ -162,7 +186,7 @@ export default function Masters() {
       .single()
 
     if (insertError) {
-      setError('Could not add country.')
+      setError(`${getSupabaseErrorMessage('Could not add country', insertError)} ${MASTERS_SETUP_HINT}`)
       setSaving(false)
       return
     }
@@ -207,7 +231,7 @@ export default function Masters() {
       .single()
 
     if (insertError) {
-      setError('Could not add university.')
+      setError(`${getSupabaseErrorMessage('Could not add university', insertError)} ${MASTERS_SETUP_HINT}`)
       setSaving(false)
       return
     }
@@ -261,7 +285,7 @@ export default function Masters() {
 
       const { error: deleteError } = await supabase.from('countries').delete().eq('id', country.id)
       if (deleteError) {
-        setError('Could not remove country.')
+        setError(getSupabaseErrorMessage('Could not remove country', deleteError))
         setSaving(false)
         return
       }
@@ -284,7 +308,7 @@ export default function Masters() {
 
       const { error: deleteError } = await supabase.from('universities').delete().eq('id', university.id)
       if (deleteError) {
-        setError('Could not remove university.')
+        setError(getSupabaseErrorMessage('Could not remove university', deleteError))
         setSaving(false)
         return
       }
@@ -510,7 +534,9 @@ function MastersTree({
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
         {loading && <p className="px-2 text-xs text-os-muted">Loading research tree</p>}
         {!loading && countries.length === 0 && (
-          <p className="px-2 text-xs text-os-muted">No countries yet.</p>
+          <p className="px-2 text-xs text-os-muted">
+            No countries yet. If you expected the seeded list, run the Phase 3b Masters setup SQL.
+          </p>
         )}
 
         {countries.map(country => {

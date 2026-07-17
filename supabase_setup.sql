@@ -219,6 +219,41 @@ create policy "anon_all_exercises"     on exercises     for all to anon using (t
 create policy "anon_all_exercise_logs" on exercise_logs for all to anon using (true) with check (true);
 
 -- ============================================================
+-- Repair: Masters RLS policies + seed countries
+-- Run this block if /masters loads 0 countries or Add Country fails with:
+-- "new row violates row-level security policy for table countries"
+-- ============================================================
+
+alter table countries enable row level security;
+alter table universities enable row level security;
+alter table research_sources enable row level security;
+
+drop policy if exists "anon_all_countries" on countries;
+drop policy if exists "anon_all_universities" on universities;
+drop policy if exists "anon_all_research_sources" on research_sources;
+
+create policy "anon_all_countries" on countries for all to anon using (true) with check (true);
+create policy "anon_all_universities" on universities for all to anon using (true) with check (true);
+create policy "anon_all_research_sources" on research_sources for all to anon using (true) with check (true);
+
+insert into countries (name, flag_emoji)
+select name, flag_emoji
+from (
+  values
+    ('United Kingdom', '🇬🇧'),
+    ('United States', '🇺🇸'),
+    ('Japan', '🇯🇵'),
+    ('Singapore', '🇸🇬'),
+    ('Germany', '🇩🇪'),
+    ('Canada', '🇨🇦'),
+    ('Austria', '🇦🇹'),
+    ('Netherlands', '🇳🇱')
+) as seed(name, flag_emoji)
+where not exists (
+  select 1 from countries where countries.name = seed.name
+);
+
+-- ============================================================
 -- Migration: category-scoped exercise logs
 -- Run these in order in the Supabase SQL editor ONCE
 -- ============================================================
