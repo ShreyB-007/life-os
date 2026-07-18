@@ -8,9 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev        # start dev server (localhost:5173)
 npm run build      # production build → dist/
 npm run preview    # serve the dist/ build locally
+npm run test:e2e   # Playwright end-to-end suite (tests/e2e/*.spec.ts) — requires `npm run dev` running
 ```
 
-No linter or test runner is configured.
+No linter is configured. `npm run test:e2e` runs the Playwright suite in `tests/e2e/` against `localhost:5173` and the real Supabase project (there is no separate test/staging project) — it's serial/single-worker by design since there's no per-test data isolation, and test fixtures are prefixed `QA-Test-` and swept up in `afterEach` hooks. A second, older/lighter Playwright suite lives in `qa/` (`npm run qa`, runs against the `preview` build on port 4173) — kept as-is, not superseded by `tests/e2e/`.
 
 ## Environment
 
@@ -292,3 +293,4 @@ Report: qa_reports/[filename]
 - 2026-07-13: Navbar contrast, placeholder/default-zero styling, and cable medium plate support - code-reading QA 10/10 passed; browser QA 30/30 passed; build passed
 - 2026-07-17: Masters add-country frontend diagnosis and setup-error surfacing - focused QA 38/39 passed with 1 live E2E item blocked by Supabase RLS/seed repair; browser QA 30/30 passed; build passed
 - 2026-07-17: Dashboard selected-date logging and calendar picker - focused QA 20/20 passed; browser QA 30/30 passed; build passed
+- 2026-07-18: Full adversarial Playwright E2E suite (10 files, 122 tests) added under tests/e2e/ - 122/122 passed after fixing 3 real app bugs (stale-fetch-clobbers-optimistic-write race in Dashboard/Goals/Masters — see qa_reports/playwright_final_report.md); build passed

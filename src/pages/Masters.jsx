@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { normalizeExerciseName } from '../lib/exercise'
@@ -57,6 +57,12 @@ export default function Masters() {
   const [saving, setSaving] = useState(false)
   const [researching, setResearching] = useState(null)
   const [error, setError] = useState('')
+  // Bumped by every local write to countries/universities. fetchResearchTree()
+  // replaces both arrays wholesale, so if it's still in flight when a write lands
+  // (e.g. the initial mount fetch is slow and a user immediately adds a country),
+  // its stale snapshot must not overwrite the newer state — same fix as Dashboard.jsx
+  // and Goals.jsx for the identical race.
+  const treeVersionRef = useRef(0)
 
   useEffect(() => {
     fetchResearchTree()
@@ -65,6 +71,7 @@ export default function Masters() {
   async function fetchResearchTree() {
     setLoading(true)
     setError('')
+    const version = ++treeVersionRef.current
 
     const countriesRes = await supabase
       .from('countries')
@@ -77,9 +84,11 @@ export default function Masters() {
       return
     }
 
-    const { nextCountries, nextUniversities } = splitResearchTree(countriesRes.data ?? [])
-    setCountries(nextCountries)
-    setUniversities(nextUniversities)
+    if (treeVersionRef.current === version) {
+      const { nextCountries, nextUniversities } = splitResearchTree(countriesRes.data ?? [])
+      setCountries(nextCountries)
+      setUniversities(nextUniversities)
+    }
     setLoading(false)
   }
 
@@ -191,6 +200,7 @@ export default function Masters() {
       return
     }
 
+    treeVersionRef.current += 1
     setCountries(prev => [...prev, data])
     setExpandedIds(prev => new Set([...prev, data.id]))
     setSelected({ type: 'country', id: data.id })
@@ -236,6 +246,7 @@ export default function Masters() {
       return
     }
 
+    treeVersionRef.current += 1
     setUniversities(prev => [...prev, data])
     setExpandedIds(prev => new Set([...prev, universityCountry.id]))
     setSelected({ type: 'university', id: data.id, countryId: universityCountry.id })
@@ -290,6 +301,7 @@ export default function Masters() {
         return
       }
 
+      treeVersionRef.current += 1
       setCountries(prev => prev.filter(item => item.id !== country.id))
       setUniversities(prev => prev.filter(item => item.country_id !== country.id))
       setSelected(null)
@@ -313,6 +325,7 @@ export default function Masters() {
         return
       }
 
+      treeVersionRef.current += 1
       setUniversities(prev => prev.filter(item => item.id !== university.id))
       setSelected({ type: 'country', id: university.country_id })
     }
@@ -349,6 +362,7 @@ export default function Masters() {
         prev && prev.key === key ? { ...prev, activeStep: prev.steps.length } : prev,
       )
 
+      treeVersionRef.current += 1
       if (entityType === 'country') {
         setCountries(prev => prev.map(item => (item.id === entity.id ? result.entity : item)))
         setSelected({ type: 'country', id: entity.id })

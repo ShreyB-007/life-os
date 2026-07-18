@@ -20,6 +20,12 @@ export default function Dashboard() {
   const gymCardRef = useRef(null)
   const japaneseCardRef = useRef(null)
   const dsaCardRef = useRef(null)
+  // Bumped by every todayLogs write — both local optimistic writes (onLog) and each
+  // new fetch (fetchAll's initial load, loadLogsForDate's date-change load). A fetch
+  // that resolves after being superseded (by a click that landed while it was in
+  // flight, or by a newer fetch from rapid date navigation) sees its captured version
+  // no longer match and discards its result instead of clobbering fresher state.
+  const todayLogsVersionRef = useRef(0)
 
   useEffect(() => {
     fetchAll()
@@ -35,6 +41,7 @@ export default function Dashboard() {
   }, [selectedDate])
 
   async function fetchAll() {
+    const version = ++todayLogsVersionRef.current
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - 400)
     const y = cutoff.getFullYear(), mo = String(cutoff.getMonth()+1).padStart(2,'0'), d = String(cutoff.getDate()).padStart(2,'0')
@@ -56,22 +63,27 @@ export default function Dashboard() {
       const dsaLogs = allLogs.filter(l => l.habit_key === 'dsa')
 
       setLogs({ gym: gymLogs, japanese: japaneseLogs, dsa: dsaLogs })
-      setTodayLogs({
-        gym: gymLogs.find(l => l.log_date === selectedDate) ?? null,
-        japanese: japaneseLogs.find(l => l.log_date === selectedDate) ?? null,
-        dsa: dsaLogs.find(l => l.log_date === selectedDate) ?? null,
-      })
+      if (todayLogsVersionRef.current === version) {
+        setTodayLogs({
+          gym: gymLogs.find(l => l.log_date === selectedDate) ?? null,
+          japanese: japaneseLogs.find(l => l.log_date === selectedDate) ?? null,
+          dsa: dsaLogs.find(l => l.log_date === selectedDate) ?? null,
+        })
+      }
     }
 
     if (goalsRes.data) setGoals(goalsRes.data)
   }
 
   async function loadLogsForDate(date) {
+    const version = ++todayLogsVersionRef.current
     const { data } = await supabase
       .from('habit_logs')
       .select('*')
       .in('habit_key', ['gym', 'japanese', 'dsa'])
       .eq('log_date', date)
+
+    if (todayLogsVersionRef.current !== version) return
 
     const newTodayLogs = { gym: null, japanese: null, dsa: null }
     data?.forEach(log => {
@@ -87,6 +99,7 @@ export default function Dashboard() {
     const cardRefs = { gym: gymCardRef, japanese: japaneseCardRef, dsa: dsaCardRef }
 
     if (date === selectedDate) {
+      todayLogsVersionRef.current += 1
       setTodayLogs(prev => {
         const wasAlreadyDone =
           prev[habitKey]?.done === true || prev[habitKey]?.is_rest_day === true

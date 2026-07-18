@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   GOAL_COLOR_OPTIONS,
@@ -18,6 +18,12 @@ export default function Goals() {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // Bumped by every local write to `goals` (create/edit, quick progress, delete).
+  // fetchGoals() replaces the whole array wholesale, so if it's still in flight when
+  // a write lands (e.g. the initial mount fetch is slow and a user immediately
+  // creates a goal or nudges progress), its stale snapshot must not overwrite the
+  // newer optimistic state — this mirrors the same fix applied to Dashboard.jsx.
+  const goalsVersionRef = useRef(0)
 
   useEffect(() => {
     fetchGoals()
@@ -26,6 +32,7 @@ export default function Goals() {
   async function fetchGoals() {
     setLoading(true)
     setError('')
+    const version = ++goalsVersionRef.current
 
     const { data, error: fetchError } = await supabase
       .from('goals')
@@ -38,8 +45,10 @@ export default function Goals() {
       return
     }
 
-    setGoals(data ?? [])
-    setDraft(buildDefaultGoal((data?.length ?? 0) + 1))
+    if (goalsVersionRef.current === version) {
+      setGoals(data ?? [])
+      setDraft(buildDefaultGoal((data?.length ?? 0) + 1))
+    }
     setLoading(false)
   }
 
@@ -127,6 +136,7 @@ export default function Goals() {
       return
     }
 
+    goalsVersionRef.current += 1
     setGoals(prev => {
       const next = editingId
         ? prev.map(goal => (goal.id === editingId ? data : goal))
@@ -143,6 +153,7 @@ export default function Goals() {
     const status =
       progress === 100 ? 'complete' : goal.status === 'complete' ? 'active' : goal.status
 
+    goalsVersionRef.current += 1
     setGoals(prev =>
       prev.map(item =>
         item.id === goal.id
@@ -168,6 +179,7 @@ export default function Goals() {
   async function deleteGoal(goal) {
     setError('')
     const previousGoals = goals
+    goalsVersionRef.current += 1
     setGoals(prev => prev.filter(item => item.id !== goal.id))
 
     const { error: deleteError } = await supabase.from('goals').delete().eq('id', goal.id)

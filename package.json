@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 4173",
-    "qa": "playwright test -c qa/playwright.config.mjs"
+    "qa": "playwright test -c qa/playwright.config.mjs",
+    "test:e2e": "playwright test"
   },
   "keywords": [],
   "author": "",
