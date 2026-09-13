@@ -11,6 +11,8 @@ import GoalsSection from '../components/GoalsSection'
 import BottomRow from '../components/BottomRow'
 import NeuralConstellation from '../components/NeuralConstellation'
 
+const GYM_REST_DAYS = [0] // Sunday — kept in sync with GymCard/computeStreak's rest-day config
+
 export default function Dashboard() {
   const [logs, setLogs] = useState({ gym: [], japanese: [], dsa: [] })
   const [todayLogs, setTodayLogs] = useState({ gym: null, japanese: null, dsa: null })
@@ -40,6 +42,32 @@ export default function Dashboard() {
     loadLogsForDate(selectedDate)
   }, [selectedDate])
 
+  // If `date` is a configured gym rest day and no gym log exists for it yet, silently
+  // log it as a rest day so the user doesn't have to press "Rest day" themselves.
+  // Uses insert() rather than upsert() so a real write that lands in between our
+  // null-check and this call (the user confirming a workout) wins via unique-
+  // constraint conflict instead of being clobbered by this stale rest entry. The
+  // version check catches the local-only case (e.g. an unsaved selection reverted
+  // without writing to the DB) by requiring nothing else touched todayLogs since.
+  async function autoLogGymRestIfNeeded(date, gymLog) {
+    if (gymLog) return
+    const dayOfWeek = new Date(`${date}T00:00:00`).getDay()
+    if (!GYM_REST_DAYS.includes(dayOfWeek)) return
+
+    const versionAtCheck = todayLogsVersionRef.current
+    const logEntry = {
+      habit_key: 'gym',
+      log_date: date,
+      done: true,
+      is_rest_day: true,
+      payload: { workout_type: 'rest' },
+      logged_at: new Date().toISOString(),
+    }
+    const { error } = await supabase.from('habit_logs').insert(logEntry)
+    if (error || todayLogsVersionRef.current !== versionAtCheck) return
+    onLog('gym', logEntry)
+  }
+
   async function fetchAll() {
     const version = ++todayLogsVersionRef.current
     const cutoff = new Date()
@@ -64,11 +92,13 @@ export default function Dashboard() {
 
       setLogs({ gym: gymLogs, japanese: japaneseLogs, dsa: dsaLogs })
       if (todayLogsVersionRef.current === version) {
+        const gymLog = gymLogs.find(l => l.log_date === selectedDate) ?? null
         setTodayLogs({
-          gym: gymLogs.find(l => l.log_date === selectedDate) ?? null,
+          gym: gymLog,
           japanese: japaneseLogs.find(l => l.log_date === selectedDate) ?? null,
           dsa: dsaLogs.find(l => l.log_date === selectedDate) ?? null,
         })
+        autoLogGymRestIfNeeded(selectedDate, gymLog)
       }
     }
 
@@ -90,6 +120,7 @@ export default function Dashboard() {
       newTodayLogs[log.habit_key] = log
     })
     setTodayLogs(newTodayLogs)
+    autoLogGymRestIfNeeded(date, newTodayLogs.gym)
   }
 
   // Called by each card after every log operation (optimistic).

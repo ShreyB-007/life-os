@@ -40,7 +40,7 @@ export default function TopBar({ overallStreak, selectedDate, onSelectedDateChan
   const tier = getStreakTier(overallStreak)
   const next = getNextMilestone(overallStreak)
   const cfg = TIER_CONFIG[tier]
-  const now = new Date()
+  const viewedDate = new Date(`${selectedDate}T00:00:00`)
 
   return (
     <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
@@ -49,7 +49,7 @@ export default function TopBar({ overallStreak, selectedDate, onSelectedDateChan
         <h1 className="font-display text-[28px] font-bold leading-tight text-os-fg tracking-tight">
           {getGreeting()}, Shrey
         </h1>
-        <p className="text-sm font-body text-os-muted mt-1 tracking-wide">{formatDate(now)}</p>
+        <p className="text-sm font-body text-os-muted mt-1 tracking-wide">{formatDate(viewedDate)}</p>
       </div>
 
       <DateSelector selectedDate={selectedDate} onSelectedDateChange={onSelectedDateChange} />

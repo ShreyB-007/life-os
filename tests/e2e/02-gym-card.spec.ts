@@ -25,6 +25,13 @@ test.describe('Gym Card', () => {
   })
 
   test('closing the drawer without logging reverts selection (no crash, gym not done)', async ({ page }) => {
+    // Seed a neutral (not-rest, not-done) gym log so a run landing on the configured
+    // Sunday auto-rest day doesn't have the background auto-log flip the card back to
+    // "Rest day" after this test's local, unsaved selection is reverted.
+    await testDb.from('habit_logs').upsert(
+      { habit_key: 'gym', log_date: todayStr(), done: false, is_rest_day: false, payload: {} },
+      { onConflict: 'habit_key,log_date' },
+    )
     await page.goto('/')
     await page.getByRole('button', { name: 'Push', exact: false }).first().click()
     await expect(page.getByRole('heading', { name: /Push Day/ })).toBeVisible()
@@ -72,6 +79,13 @@ test.describe('Gym Card', () => {
     const day2 = addDays(day1, 1) === today ? addDays(day1, 2) : addDays(day1, 1)
 
     try {
+      // Seed a neutral (not-rest, not-done) log for today so a run landing on the
+      // configured Sunday auto-rest day doesn't have the background auto-log count
+      // today itself toward this week's 2-rest-day cap before day1/day2 are inserted.
+      await testDb.from('habit_logs').upsert(
+        { habit_key: 'gym', log_date: today, done: false, is_rest_day: false, payload: {} },
+        { onConflict: 'habit_key,log_date' },
+      )
       await testDb.from('habit_logs').upsert(
         { habit_key: 'gym', log_date: day1, done: true, is_rest_day: true, payload: { workout_type: 'rest' } },
         { onConflict: 'habit_key,log_date' },
@@ -126,6 +140,13 @@ test.describe('Gym Card', () => {
   })
 
   test('adversarial: an even number of rapid clicks lands back on closed+unselected (backdrop absorbs the alternate click)', async ({ page }) => {
+    // Seed a neutral (not-rest, not-done) gym log so a run landing on the configured
+    // Sunday auto-rest day doesn't have the background auto-log flip the card back to
+    // "Rest day" after this test's local, unsaved selection is reverted.
+    await testDb.from('habit_logs').upsert(
+      { habit_key: 'gym', log_date: todayStr(), done: false, is_rest_day: false, payload: {} },
+      { onConflict: 'habit_key,log_date' },
+    )
     await page.goto('/')
     const pushBtn = page.getByRole('button', { name: 'Push', exact: false }).first()
     for (let i = 0; i < 4; i++) {

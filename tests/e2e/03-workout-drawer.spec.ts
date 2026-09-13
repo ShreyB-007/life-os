@@ -132,7 +132,10 @@ test.describe('Workout Drawer + Exercise Card', () => {
   test('progress graph opens from the chart icon and closes', async ({ page }) => {
     await openDrawer(page)
     await addExercise(page, `${QA_PREFIX}Curl`)
-    await page.getByRole('button', { name: 'View graph' }).click()
+    // .last() — other real, non-fixture exercises already logged under Push each render
+    // their own "View graph" button too; newly-added exercises are appended to the end
+    // of the list (ordered by created_at ascending), so the new one's button is last.
+    await page.getByRole('button', { name: 'View graph' }).last().click()
     await expect(page.getByText('Log at least 1 session to see your progress graph')).toBeVisible()
     await page.locator('div[class*="top-1/2"][class*="-translate-x-1/2"] button:has(i.ti-x)').click()
     await expect(page.getByText('Log at least 1 session to see your progress graph')).toHaveCount(0)

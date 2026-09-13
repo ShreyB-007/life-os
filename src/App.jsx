@@ -8,6 +8,7 @@ import MastersCountryReport from './pages/MastersCountryReport'
 import MastersUniversityReport from './pages/MastersUniversityReport'
 import Digest from './pages/Digest'
 import Review from './pages/Review'
+import NotFound from './pages/NotFound'
 import FloatingIcons from './components/FloatingIcons'
 
 export default function App() {
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/masters/university/:universityId" element={<MastersUniversityReport />} />
           <Route path="/digest" element={<Digest />} />
           <Route path="/review" element={<Review />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
     </div>

@@ -30,7 +30,10 @@ function GoalRow({ goal, index }) {
     <div className="habit-card card-interactive flex items-center gap-3 rounded-xl px-4 py-3">
       <i className={`ti ti-${icon} text-sm shrink-0`} style={{ color }} />
 
-      <span className="text-sm font-body w-36 truncate shrink-0 text-os-secondary">
+      <span
+        className="text-sm font-body w-48 truncate shrink-0 text-os-secondary"
+        title={name}
+      >
         {name}
       </span>
 

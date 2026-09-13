@@ -294,3 +294,4 @@ Report: qa_reports/[filename]
 - 2026-07-17: Masters add-country frontend diagnosis and setup-error surfacing - focused QA 38/39 passed with 1 live E2E item blocked by Supabase RLS/seed repair; browser QA 30/30 passed; build passed
 - 2026-07-17: Dashboard selected-date logging and calendar picker - focused QA 20/20 passed; browser QA 30/30 passed; build passed
 - 2026-07-18: Full adversarial Playwright E2E suite (10 files, 122 tests) added under tests/e2e/ - 122/122 passed after fixing 3 real app bugs (stale-fetch-clobbers-optimistic-write race in Dashboard/Goals/Masters — see qa_reports/playwright_final_report.md); build passed
+- 2026-09-13: 8-bug fix pass (date-selector greeting, Sunday gym auto-rest, 404 route, stale placeholders, goal name truncation; bugs 3/7/8 confirmed not reproducible or intentionally skipped) — 122/122 e2e passed (2 consecutive clean runs, 3 tests updated for the new auto-rest behavior); build passed

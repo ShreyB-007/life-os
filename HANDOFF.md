@@ -1,68 +1,74 @@
 # Life OS — Handoff Log
 
 ## Meta
-Last updated: 2026-07-18T21:30:00+05:30
+Last updated: 2026-09-13T11:45:00+05:30
 Last updated by: Claude Code
-Current phase: Phase 1–3 — Adversarial QA session (no new features)
+Current phase: Phase 1–3 — Bug-fix session (no new features)
 
 ## Just Completed (this session)
 - Read HANDOFF.md, qa_reports/, and recent commits before starting (per protocol).
-- This was a dedicated adversarial QA session, not feature work: installed/configured Playwright (`playwright.config.ts`, `tests/e2e/`), wrote 10 spec files (122 tests) covering Dashboard, GymCard, WorkoutDrawer/ExerciseCard, JapaneseCard, DSACard, the date selector, Goals, Masters, Navigation, and light/dark mode.
-- Applied the already-authored "Repair: Masters RLS policies + seed countries" block from `supabase_setup.sql` (this was HANDOFF's own previously-queued next step) — Masters now has all 8 seeded countries with working anon RLS on countries/universities/research_sources.
-- Ran the full suite repeatedly, diagnosed every failure down to a root cause, and fixed them — found and fixed **3 real app bugs**, all the same class of race condition (see Decisions/Unresolved below and `qa_reports/playwright_final_report.md` for full detail).
-- Final result: 122/122 passing, confirmed stable across two consecutive full clean runs. `npm run build` passes cleanly.
-- Added `npm run test:e2e` script; updated CLAUDE.md's Commands section and QA History.
-- All Playwright-created test fixtures (goals/countries/universities/exercises named `QA-Test-*`, today's habit_logs test rows) were cleaned up; the 5 real goals, 8 seeded countries (Japan's real prior Gemini research intact), and pre-existing historical habit_logs rows are untouched.
+- Fixed 6 reported bugs (Bug 3 was explicitly skipped as intentional; Bugs 7 and 8 were investigated and found to already work correctly on `main` — no code change needed for those two):
+  1. **Dashboard greeting header frozen on today's date** — `TopBar.jsx` now formats the date line from `selectedDate` instead of `new Date()`, so it updates when navigating to a past date. (The historical-data-loading half of this bug — i.e. past dates showing today's logs — was already fixed correctly in a prior session via `loadLogsForDate`'s version-guarded fetch; verified via browser + a live DB check, not reproducible on current `main`.)
+  2. **Sunday gym rest day not auto-logged** — added `autoLogGymRestIfNeeded()` in `Dashboard.jsx`. On mount and on date change, if the viewed date's day-of-week is in `GYM_REST_DAYS` (`[0]`, Sunday) and no gym log exists yet for it, silently inserts a rest-day log. Uses `insert()` (not `upsert()`) so a real write that lands in the same window (e.g. the user actually confirming a workout) wins via unique-constraint conflict instead of being clobbered; also re-checks `todayLogsVersionRef` after the write before touching local state, so a local-only change (e.g. an unsaved selection reverted) isn't stomped either.
+  3. Bug 3 (false PR badge on new exercises) — skipped per explicit instruction, no change made.
+  4. **No 404 handling** — added `src/pages/NotFound.jsx` (matches the existing design system — `habit-card`/`card-interactive` classes, Tabler icon, Syne/Outfit fonts) and a catch-all `<Route path="*">` in `App.jsx`.
+  5. **Stale "Coming in Phase 2" placeholders** — `Digest.jsx` → "Coming in Phase 4", `Review.jsx` → "Coming in Phase 5".
+  6. **Goal name truncation** — `GoalsSection.jsx`'s goal-row name span widened from `w-36` to `w-48` and given a `title` attribute (native tooltip) as a fallback for names that still don't fit.
+  7. & 8. Gym streak-after-rest-day and lingering "Select workout" text — reproduced the exact DB state (rest day logged, no prior history) and a synthetic multi-day-streak-then-rest scenario in the browser; `computeStreak`'s rest-day handling and `GymCard`'s status text already behave correctly in both cases. No code change made; flagged in case the user can reproduce with more specific repro steps.
+- Fixed 3 e2e tests in `tests/e2e/02-gym-card.spec.ts` and `tests/e2e/03-workout-drawer.spec.ts` that broke as a direct, correct consequence of the Bug 2 fix (all three were asserting behavior that's only valid on non-rest days — the app change is intentional, the tests were stale):
+  - Two gym-card tests ("closing the drawer without logging reverts selection", "adversarial: an even number of rapid clicks...") now seed a neutral (`done:false, is_rest_day:false`) gym log for today before `page.goto('/')`, so a run landing on the real Sunday auto-rest day isn't affected by the new auto-log.
+  - The rest-day-cap test now seeds the same neutral log for *today* specifically, since today falling on the scheduled rest day was otherwise silently consuming one of the week's 2 rest-day slots before the test's own `day1`/`day2` inserts, throwing off the "1 of 2" / "2 of 2" assertions.
+  - The workout-drawer "progress graph" test was unrelated to my change (pre-existing DB drift — two real, non-fixture Push exercises now exist from actual app usage, so the old `getByRole('button', {name:'View graph'})` locator resolved to 2 elements instead of 1). Changed to `.last()`, since newly-added exercises are appended to the end of the list (`ORDER BY created_at`).
+  - One DSA test failure seen in two of four full-suite runs (`05-dsa-card.spec.ts` reload tests) was confirmed to be pre-existing flakiness against the live shared dev DB, unrelated to any change this session — passes reliably every time when run in isolation.
+- Verified all fixes live in the browser (Chrome, via `mcp__claude-in-chrome`) against the real dev server and real Supabase project, including injecting and then cleaning up temporary multi-day gym history to exercise the rest-day/streak interaction.
+- Full suite run twice clean at the end: **122/122 passed** both times. `npm run build` passes clean (pre-existing >500kB chunk-size warning only, unrelated).
 
 ## In Progress (incomplete — pick up here first)
 None — see Queued Next.
 
 ## Queued Next (in priority order)
-1. Run the cable payload migration at the bottom of `supabase_setup.sql` in the Supabase SQL editor to convert existing `{ plates, mini, reps }` rows to `{ big, medium, small, reps }` (still outstanding from before this session — untouched here).
-2. Consider updating `CLAUDE.md`'s Architecture → "Gym deselect/override" line — it says "clicking an already-active workout type deselects it," which no longer matches `GymCard.jsx` (re-clicking the active type always reopens the drawer; there's no deselect-via-reclick path). Found during this session's testing; not changed since it's a documentation call, not a code bug — see `qa_reports/playwright_final_report.md` "Adversarial findings."
-3. Phase 4 — News Feeds (Gemini), or Phase 3c polish, per the existing backlog (unrelated to this session).
-4. Consider cleaning up pre-existing `logged_at: new Date().toISOString()` usage if the project wants to enforce the "no toISOString anywhere" code-quality rule literally (unrelated to this session).
-5. Optional: run `npm run test:e2e` periodically (or before releases) to catch regressions in the three fixed race conditions and the rest of the covered surface — see `tests/e2e/` and `qa_reports/playwright_final_report.md`.
+1. Run the cable payload migration at the bottom of `supabase_setup.sql` in the Supabase SQL editor to convert existing `{ plates, mini, reps }` rows to `{ big, medium, small, reps }` (outstanding from before this session — untouched here).
+2. If Bugs 7/8 (gym streak-after-rest, lingering "Select workout" text) still reproduce for the user in real usage, get exact repro steps (what the streak/history looked like right before the rest day was logged, and whether it was auto-logged vs. manually clicked) — code-level investigation this session could not reproduce either with real or synthetic multi-day data.
+3. Consider updating `CLAUDE.md`'s Architecture → "Gym deselect/override" line (stale relative to `GymCard.jsx` — carried over from a prior session's notes).
+4. Phase 4 — News Feeds (Gemini), or Phase 3c polish, per the existing backlog.
+5. Optional: `logged_at: new Date().toISOString()` cleanup for literal compliance with the "no toISOString anywhere" rule (pre-existing, unrelated).
 
 ## Phase Completion Status
--> Phase 1 (Dashboard + Habits): Complete — now covered by an E2E regression suite
--> Phase 2 (Gym Workout Tracker): Feature-complete — now covered by an E2E regression suite; cable payload migration still needs a manual DB run
--> Phase 3 (Goals Page + Masters Research Agent): Feature implemented, Masters RLS/seed gap now repaired — now covered by an E2E regression suite
--> Phase 4 (News Feeds - Gemini): Not started
--> Phase 5 (Weekly Review + Polish): Not started
+-> Phase 1 (Dashboard + Habits): Complete — date-selector greeting bug and Sunday auto-rest gap fixed this session
+-> Phase 2 (Gym Workout Tracker): Feature-complete — cable payload migration still needs a manual DB run
+-> Phase 3 (Goals Page + Masters Research Agent): Feature-complete
+-> Phase 4 (News Feeds - Gemini): Not started — placeholder now correctly says "Coming in Phase 4"
+-> Phase 5 (Weekly Review + Polish): Not started — placeholder now correctly says "Coming in Phase 5"
 
 ## Known Working Features (do not regress these)
-- Everything previously listed here still holds (Dashboard date selector, Gym/Japanese/DSA cards, WorkoutDrawer, Goals, Masters) — see prior handoff history in git log for the full list; not re-enumerated here since it's unchanged and now has automated coverage in `tests/e2e/`.
-- **New this session:** Dashboard's `todayLogs`, Goals' `goals`, and Masters' `countries`/`universities` state are now protected against the mount-fetch-clobbers-optimistic-write race (see Decisions below) — verify this isn't reverted if `fetchAll`/`loadLogsForDate`/`onLog` (Dashboard), `fetchGoals`/`saveGoal`/`quickProgress`/`deleteGoal` (Goals), or `fetchResearchTree`/`addCountry`/`addUniversity`/`confirmRemove`/`handleResearch` (Masters) are touched again.
-- Masters tree: all 8 seed countries load correctly with working RLS (previously only 1 country existed due to a missing policy — now repaired).
+- Everything previously listed here still holds — see prior handoff history in git log.
+- **New this session:** Sunday is auto-logged as a gym rest day (silently, via `Dashboard.jsx`'s `autoLogGymRestIfNeeded`) if no gym log exists yet for that date — do not remove this without also removing/updating the `GYM_REST_DAYS` constant and the two e2e tests seeded to bypass it (see `tests/e2e/02-gym-card.spec.ts`).
+- **New this session:** unknown routes render `NotFound.jsx` via the catch-all `<Route path="*">` in `App.jsx` — keep this last in the `<Routes>` list.
+- **New this session:** the Dashboard header date line reflects `selectedDate`, not the real current date — do not revert `TopBar.jsx` to using `new Date()` there.
 
 ## Decisions Made (do not reverse without explicit user instruction)
 - All prior decisions still stand (see git history) — not re-listed here.
-- **New:** Dashboard/Goals/Masters each use a `useRef` version counter (`todayLogsVersionRef`, `goalsVersionRef`, `treeVersionRef`) bumped on every local optimistic write and checked before a fetch's full-replacement `setState` is applied. This is the fix for a real, reproducible race condition (see Unresolved/history below) — do not remove this guard when touching these files' fetch functions.
-- `tests/e2e/` is a new, separate Playwright suite from the pre-existing `qa/` folder (`npm run qa`, targets the preview build on port 4173). Both are kept; `tests/e2e/` is the more comprehensive adversarial suite and targets the dev server directly.
-- E2E tests run serially (single worker) against the live dev DB (no test/staging Supabase project exists) — do not add `fullyParallel: true` without also adding real data isolation, or tests will corrupt each other's state.
-- Masters research/refresh in E2E tests is mocked via `page.route` interception of `**/functions/v1/masters-research` rather than hitting the real Gemini API, to avoid burning the shared 20/day free-tier quota noted in prior QA history.
+- **New:** the Sunday auto-rest-log write uses `insert()`, not `upsert()`, specifically so it can never silently overwrite a real, already-confirmed gym log — if this needs to become an upsert for some future reason, keep the `todayLogsVersionRef` re-check before calling `onLog` regardless.
+- **New:** `GYM_REST_DAYS = [0]` is defined locally in `Dashboard.jsx` (kept in sync by comment with `computeStreak`'s own `[0]` argument and `GymCard`'s week-cap logic) rather than extracted to a shared config file — three call sites, not worth the indirection yet.
 
 ## Unresolved Issues
 - Cable payload migration must still be run manually in the Supabase SQL editor (unchanged from before this session).
-- `logged_at: new Date().toISOString()` usage remains in some files (unchanged, pre-existing, unrelated to this session).
-- `CLAUDE.md`'s Gym "deselect/override" documentation line is stale relative to actual `GymCard.jsx` behavior (see Queued Next #2) — informational only, not a functional bug.
-- Masters: no duplicate-country-name protection (universities are protected, countries are not) — confirmed intentional-or-not-yet-decided via testing, not fixed. Flag for a product decision if it matters.
-- Goals: no client-side name length limit, no duplicate-name check, and Progress/Status can be saved independently (out of sync) via the edit form — confirmed via testing, not fixed, same reasoning as above.
+- `logged_at: new Date().toISOString()` usage remains in some files (unchanged, pre-existing).
+- `CLAUDE.md`'s Gym "deselect/override" documentation line is stale relative to actual `GymCard.jsx` behavior — informational only.
+- Bugs 7/8 as originally reported could not be reproduced this session (see Queued Next #2) — closed as "works as intended" pending a concrete repro from the user.
+- `05-dsa-card.spec.ts`'s two reload-persistence tests are flaky under full-suite serial execution against the live dev DB (pass 100% in isolation) — pre-existing, unrelated to this session's changes.
 
 ## Files Changed This Session
-- `playwright.config.ts` — new, root-level Playwright config for `tests/e2e/`.
-- `tests/e2e/helpers.ts` — new, shared test utilities (Supabase test-DB client, date helpers, fixture cleanup, contrast-checking).
-- `tests/e2e/01-dashboard.spec.ts` through `tests/e2e/10-light-dark-mode.spec.ts` — new, 10 spec files, 122 tests total.
-- `src/pages/Dashboard.jsx` — added `todayLogsVersionRef` race-condition guard (see Decisions).
-- `src/pages/Goals.jsx` — added `goalsVersionRef` race-condition guard (see Decisions).
-- `src/pages/Masters.jsx` — added `treeVersionRef` race-condition guard (see Decisions).
-- `package.json` — added `test:e2e` script.
-- `CLAUDE.md` — updated Commands section, appended QA History entry.
-- `qa_reports/playwright_final_report.md` — new, full findings write-up (local-only, gitignored).
-- Supabase (remote, not a file): applied the pre-authored Masters RLS repair + country seed migration from `supabase_setup.sql`.
+- `src/pages/Dashboard.jsx` — added `GYM_REST_DAYS` constant and `autoLogGymRestIfNeeded()`, wired into `fetchAll()` and `loadLogsForDate()` (Bug 2).
+- `src/components/TopBar.jsx` — date line now derives from `selectedDate` (Bug 1, greeting-header half).
+- `src/pages/NotFound.jsx` — new, 404 page matching the design system (Bug 4).
+- `src/App.jsx` — added catch-all `<Route path="*">` → `NotFound` (Bug 4).
+- `src/pages/Digest.jsx`, `src/pages/Review.jsx` — placeholder text updated to Phase 4 / Phase 5 (Bug 5).
+- `src/components/GoalsSection.jsx` — goal name column widened + `title` tooltip (Bug 6).
+- `tests/e2e/02-gym-card.spec.ts` — 3 tests updated to seed a neutral gym log for today, decoupling them from the real calendar day now that Sunday auto-rest-logs.
+- `tests/e2e/03-workout-drawer.spec.ts` — "progress graph" test's button locator changed to `.last()` to tolerate real (non-fixture) Push exercises already in the dev DB.
 
 ## QA Status
-Last QA run: 2026-07-18 (Playwright E2E, two consecutive clean runs)
+Last QA run: 2026-09-13 (Playwright E2E, two consecutive clean full-suite runs after fixes)
 Pass rate: 122/122 (build passed)
-Report: qa_reports/playwright_final_report.md
+Report: this HANDOFF.md entry (no separate qa_reports/ file generated this session — all findings and fixes were straightforward enough to track inline)
