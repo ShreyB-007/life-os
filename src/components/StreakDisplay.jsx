@@ -3,7 +3,7 @@ import { getStreakTier } from '../lib/streaks'
 
 const tierConfig = {
   cold: {
-    color: 'var(--os-muted)',
+    color: 'var(--streak-cold)',
     filter: 'none',
     animation: '',
   },

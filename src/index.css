@@ -73,6 +73,10 @@
   --os-secondary: #4A4A70;
   --os-muted:     #9090B0;
   --os-indigo:    #6366F1;
+  /* Streak number at 0 (cold tier) — darker than --os-muted specifically so it
+     clears 4.5:1 against both the default translucent card and the even more
+     translucent .habit-card-done surface (see contrast calc in HANDOFF.md). */
+  --streak-cold:  #5A5A70;
 
   /* Card surfaces — light: periwinkle-tinted glass */
   --card-bg:      rgba(240, 240, 255, 0.70);
@@ -104,6 +108,7 @@ html.dark {
   --os-fg:        #E8E8F0;
   --os-secondary: #8888A0;
   --os-muted:     #6A6A88;
+  --streak-cold:  #8A8AA8;
 
   /* Dark: genuine glassmorphism — galaxy visible through cards */
   --card-bg:      rgba(8, 10, 24, 0.28);
