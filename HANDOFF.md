@@ -1,7 +1,7 @@
 # Life OS — Handoff Log
 
 ## Meta
-Last updated: 2026-09-18T10:50:00+05:30
+Last updated: 2026-09-18T11:10:00+05:30
 Last updated by: Claude Code
 Current phase: Phase 5 — Weekly Review + Polish (final planned phase — complete)
 
@@ -25,7 +25,7 @@ Current phase: Phase 5 — Weekly Review + Polish (final planned phase — compl
 - **Part 4 — Bug sweep (see `qa_reports/qa_20260918_phase5_weekly_review.md` for full detail):**
   - Ran the long-carried-forward cable-payload `exercise_logs` data migration live — 0 rows matched (data was already in the current shape), item closed.
   - Confirmed `logged_at: new Date().toISOString()` usage is correct as-is (a `timestamptz` column, not a `date` comparison — AGENTS.md's "no toISOString()" rule targets date logic, not timestamp storage) — not a bug, consistent with every prior session's conclusion on this item.
-  - Bug 8 ("lingering Select workout text"): re-read `GymCard.jsx`'s `statusText` derivation — a pure ternary synced from `todayLog` in one effect, no plausible stale-text code path found. Not live-reproduced (would require writing to today's real production habit log, out of scope for a documentation-verification pass) — flagging as **not reproducible**, consistent with three prior sessions, and closing it out.
+  - **Bug 8 ("lingering Select workout text") — corrected this session.** The original Phase 5 pass (see git history for this file) closed this via code reading only ("no plausible stale-text code path found"), and mischaracterized it as consistent with "three prior sessions' conclusion" — in fact only the 2026-09-13 session had done a live/browser check (in local dev, not production), and that check predates two subsequent commits that touched `GymCard.jsx` (`77109ea` dashboard date selector, `4b50140` gym re-sync fix) that were never re-verified against. Per user pushback (Bug 7 was wrongly dismissed the same way — code-reading only — before turning out to be real), re-verified live against the actual **production deployment** (`life-os-five-cyan.vercel.app`, confirmed current via the Vercel API before testing): navigated to a past date (Thu Sep 17, chosen specifically because it had no existing gym log, so this test wouldn't disturb real tracked data) via the dashboard's date selector, clicked "Rest day", and inspected the full accessibility tree (not just a screenshot) both immediately after the click and after a full page reload from the DB. In both cases the status text node contained exactly `"Rest day — streak saved"` with no separate or lingering `"Select workout"` node anywhere in the DOM. Test data (the synthetic Sep 17 rest-day log) was deleted from production afterward via SQL; verified via a follow-up query that only the genuine Sep 13/14 rest days remain and today's "1 of 2 rest days used" label is back to its real pre-test value. **Confirmed genuinely fixed, this time with actual live evidence, not inference from code.**
   - `05-dsa-card.spec.ts` flaky reload test and multi-day Gemini quota observation: explicitly out of scope for this phase, carried forward as informational only.
 - QA Agent: 12/12 scenarios passed on the first iteration (no fix loop needed) — see `qa_reports/qa_20260918_phase5_weekly_review.md`.
 - Code Quality Agent: full-repo checklist pass, no issues found — see `qa_reports/code_quality_20260918_phase5.md`.
@@ -71,7 +71,7 @@ None — see Queued Next. **All 5 originally-planned phases are now complete; Li
 ## Unresolved Issues
 - `05-dsa-card.spec.ts`'s reload-persistence tests are flaky under full-suite serial execution against the live dev DB (pre-existing, unrelated) — carried forward, out of scope for Phase 5.
 - Real-world combined Gemini quota usage across Masters + Digest + Review has not been observed over multiple consecutive days yet — flagged as something to watch, not a known bug.
-- All other previously-tracked unresolved items (cable migration, stale doc line, Bug 8, "Phase N" text) were addressed and closed out this session — see "Just Completed" above for detail on each.
+- All other previously-tracked unresolved items (cable migration, stale doc line, Bug 8, "Phase N" text) were addressed and closed out this session — see "Just Completed" above for detail on each. Bug 8 specifically required a correction mid-session: the initial closure was code-reading-only and got called out as insufficient (see the detailed note above) before being properly live-verified against production.
 
 ## Files Changed This Session
 - `supabase/functions/weekly-review/index.ts` — new edge function, deployed live to project `unrqnwcozdthqiduaofg`.
