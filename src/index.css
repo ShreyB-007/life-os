@@ -326,6 +326,15 @@ html.dark .gym-rest-btn {
   border-color: var(--input-hover-border);
 }
 
+/* ─── Hide scrollbar on horizontally-scrollable strips (navbar links, tab bars) ──── */
+.scroll-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scroll-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* ─── Action pill buttons (exercise card / DSA graph icon) ──── */
 .action-pill-btn {
   display: inline-flex;

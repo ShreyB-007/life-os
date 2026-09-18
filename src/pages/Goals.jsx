@@ -195,7 +195,7 @@ export default function Goals() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[11px] font-body font-semibold uppercase tracking-widest text-os-muted">
-              Phase 3
+              Targets
             </p>
             <h1 className="mt-2 font-display text-4xl font-semibold text-os-fg">
               Goals

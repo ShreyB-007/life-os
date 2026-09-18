@@ -17,7 +17,7 @@ import {
 
 const EMPTY_COUNTRY = { name: '', flag_emoji: '' }
 const EMPTY_UNIVERSITY = { name: '', city: '' }
-const MASTERS_SETUP_HINT = 'Run the Phase 3b Masters setup/repair SQL in Supabase, then reload this page.'
+const MASTERS_SETUP_HINT = 'Run the Masters setup/repair SQL in supabase_setup.sql, then reload this page.'
 
 function getSupabaseErrorMessage(action, error) {
   if (!error) return `${action}.`
@@ -549,7 +549,7 @@ function MastersTree({
         {loading && <p className="px-2 text-xs text-os-muted">Loading research tree</p>}
         {!loading && countries.length === 0 && (
           <p className="px-2 text-xs text-os-muted">
-            No countries yet. If you expected the seeded list, run the Phase 3b Masters setup SQL.
+            No countries yet. If you expected the seeded list, run the Masters setup SQL in supabase_setup.sql.
           </p>
         )}
 

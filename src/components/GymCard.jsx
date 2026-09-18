@@ -1,6 +1,6 @@
 import { useState, useEffect, forwardRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { getLocalDateString } from '../lib/dateUtils'
+import { getWeekBounds } from '../lib/dateUtils'
 import StreakDisplay from './StreakDisplay'
 import WorkoutDrawer from './WorkoutDrawer'
 import HistoryDrawer from './HistoryDrawer'
@@ -11,19 +11,6 @@ const WORKOUT_TYPES = [
   { key: 'Legs', subtitle: 'Legs · Abs' },
   { key: 'Cardio', subtitle: 'Endurance' },
 ]
-
-function getWeekBounds(dateStr) {
-  const selected = new Date(`${dateStr}T00:00:00`)
-  const daysToMonday = (selected.getDay() + 6) % 7
-  const monday = new Date(selected)
-  monday.setDate(selected.getDate() - daysToMonday)
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-  return {
-    mondayStr: getLocalDateString(monday),
-    sundayStr: getLocalDateString(sunday),
-  }
-}
 
 const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], selectedDate, onLog }, ref) {
   const [selected, setSelected]                  = useState(null)

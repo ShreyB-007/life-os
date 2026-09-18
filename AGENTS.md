@@ -72,7 +72,7 @@ A gym rest day counts as "gym satisfied". There is no `habitsDone` state.
 
 **Gym rest-day cap** — `GymCard` enforces max 2 rest days per Mon–Sun week. Week start: `today - (today.getDay() + 6) % 7` days. At 1 used: warning label shown. At 2 used: button disabled, relabeled "Rest limit reached".
 
-**Gym deselect/override** — clicking an already-active workout type deselects it (`done=false`, cleared payload). Clicking any workout type while in rest-day state overrides it. The rest day button has no deselect.
+**Gym deselect/override** — clicking a workout type opens the exercise-logging drawer for it (pre-filled if already logged today); switching to a different type while one is active offers to carry today's session over. Clicking any workout type while in rest-day state overrides the rest day. The rest day button itself is a toggle — tapping it again while active deselects it (`done=false`, cleared payload).
 
 ## Database
 

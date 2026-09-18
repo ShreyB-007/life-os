@@ -19,8 +19,8 @@ export default function Navbar({ dark, onToggleDark }) {
         WebkitBackdropFilter: 'blur(14px)',
       }}
     >
-      <div className="max-w-[1200px] mx-auto px-6 flex items-center justify-between h-13 overflow-x-auto">
-        <div className="flex items-center gap-0.5 shrink-0">
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 flex items-center justify-between gap-2 h-13">
+        <div className="flex items-center gap-0.5 min-w-0 overflow-x-auto scroll-hide">
           {links.map(link => (
             <NavLink
               key={link.to}

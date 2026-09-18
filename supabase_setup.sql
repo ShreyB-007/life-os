@@ -206,6 +206,14 @@ create table if not exists news_digests (
   unique (feed_type, generated_date)
 );
 
+-- Phase 5: Weekly review
+create table if not exists weekly_reviews (
+  id uuid primary key default gen_random_uuid(),
+  week_start_date date not null unique,
+  content jsonb not null,
+  created_at timestamptz not null default now()
+);
+
 -- ============================================================
 -- Row Level Security — anon full access (personal app, no auth)
 -- ============================================================
@@ -219,6 +227,7 @@ alter table research_sources enable row level security;
 alter table exercises     enable row level security;
 alter table exercise_logs enable row level security;
 alter table news_digests  enable row level security;
+alter table weekly_reviews enable row level security;
 
 create policy "anon_all_habits"        on habits        for all to anon using (true) with check (true);
 create policy "anon_all_habit_logs"    on habit_logs    for all to anon using (true) with check (true);
@@ -229,6 +238,7 @@ create policy "anon_all_research_sources" on research_sources for all to anon us
 create policy "anon_all_exercises"     on exercises     for all to anon using (true) with check (true);
 create policy "anon_all_exercise_logs" on exercise_logs for all to anon using (true) with check (true);
 create policy "anon_all_news_digests"  on news_digests  for all to anon using (true) with check (true);
+create policy "anon_all_weekly_reviews" on weekly_reviews for all to anon using (true) with check (true);
 
 -- ============================================================
 -- Repair: Masters RLS policies + seed countries

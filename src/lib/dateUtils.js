@@ -17,3 +17,19 @@ export function getLocalDateString(date = new Date()) {
 export function getLocalDate() {
   return getLocalDateString(new Date())
 }
+
+// Monday-Sunday week bounds for a given local date string ('YYYY-MM-DD').
+// Shared by GymCard's rest-day cap and the weekly review's aggregation window
+// so "week" means the same thing everywhere in the app.
+export function getWeekBounds(dateStr) {
+  const selected = new Date(`${dateStr}T00:00:00`)
+  const daysToMonday = (selected.getDay() + 6) % 7
+  const monday = new Date(selected)
+  monday.setDate(selected.getDate() - daysToMonday)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  return {
+    mondayStr: getLocalDateString(monday),
+    sundayStr: getLocalDateString(sunday),
+  }
+}
