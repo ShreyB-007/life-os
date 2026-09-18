@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { compareDateStrings } from '../lib/goals'
 
 export default function BottomRow({ goals }) {
@@ -7,14 +8,13 @@ export default function BottomRow({ goals }) {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {/* AI Digest card */}
-      <div className="habit-card card-interactive rounded-xl p-4">
+      <Link to="/digest" className="habit-card card-interactive rounded-xl p-4">
         <div className="flex items-center gap-2 mb-2">
           <i className="ti ti-news text-base text-os-muted" />
-          <span className="text-sm font-display font-semibold text-os-secondary">Today's AI digest</span>
+          <span className="text-sm font-display font-semibold text-os-secondary">Today's digest</span>
         </div>
-        <p className="text-xs font-body text-os-muted">AI Digest coming in Phase 3</p>
-      </div>
+        <p className="text-xs font-body text-os-muted">Global, India, and AI/ML news — tap to open</p>
+      </Link>
 
       {/* Next milestone card */}
       <div className="habit-card card-interactive rounded-xl p-4">
