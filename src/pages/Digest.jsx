@@ -19,8 +19,14 @@ export default function Digest() {
     Object.fromEntries(FEED_TYPES.map(feedType => [feedType, EMPTY_FEED_STATE])),
   )
   const today = useRef(getLocalDate()).current
+  const hasStartedLoad = useRef(false)
 
   useEffect(() => {
+    // Guards against React 18 StrictMode's dev-only double-invoke of this
+    // effect, which would otherwise fire loadFeed() twice per feed on mount
+    // and burn 2x the shared Gemini quota on every local dev page load.
+    if (hasStartedLoad.current) return
+    hasStartedLoad.current = true
     FEED_TYPES.forEach(feedType => loadFeed(feedType))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
