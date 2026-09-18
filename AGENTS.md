@@ -157,6 +157,18 @@ Tabler Icons outline webfont loaded via CDN in `index.html`. Usage: `<i classNam
 2. Read `qa_reports/` directory — check the most recent QA report for any unresolved issues
 3. Run `git log --oneline -10` to see the last 10 commits and understand recent changes
 4. Do not ask the user what to work on if HANDOFF.md has a clear "In Progress" or "Queued Next" section — pick it up automatically
+5. **When a prior entry claims a bug is fixed or a behavior is confirmed, check its verification tag (see below) before trusting it.** Anything tagged `VERIFIED-CODE-REVIEW` or `UNVERIFIED` is a claim, not a confirmed fact — it still needs an actual live check before you rely on it or tell the user it's resolved. Only `VERIFIED-LIVE-PROD` or `VERIFIED-LIVE-DEV` mean someone actually ran/clicked/observed it. An untagged legacy entry (written before this rule existed) should be treated the same as `UNVERIFIED` until re-checked.
+
+### Verification tags (required)
+
+Every conclusion recorded about a bug, fix, or QA result — in HANDOFF.md's "Just Completed" and "Unresolved Issues" sections, in a `qa_reports/*.md` PASS/FAIL/UNCLEAR line, or in a CLAUDE.md QA History line — must be suffixed with exactly one of these tags:
+
+- **`VERIFIED-LIVE-PROD`** — actually reproduced/checked against the deployed production URL (real clicks, real network requests, real DOM/response inspected — not inferred).
+- **`VERIFIED-LIVE-DEV`** — actually reproduced/checked against the local dev server (`npm run dev`) or a live-invoked edge function/DB query, but not the deployed production build.
+- **`VERIFIED-CODE-REVIEW`** — concluded by reading source code, grepping, or reasoning about logic only. Nothing was run, clicked, or observed. This includes "the build passed" — a successful build proves the code compiles, not that the feature behaves correctly.
+- **`UNVERIFIED`** — stated as true (e.g. carried forward from a previous session, or asserted without checking) but not actually checked by any method this session.
+
+This exists because this project has twice closed real bugs as "not reproducible" based on `VERIFIED-CODE-REVIEW`-level inspection alone (Bug 7, Bug 8) — both required an actual live check to catch. A `VERIFIED-CODE-REVIEW` conclusion is not worthless (it's often correct), but it must never be silently upgraded to the confidence level of a live check, by this session or a future one. When a fix touches user-visible behavior, prefer live verification before closing it; if you can't (e.g. it requires writing to real production data with no safe test path), say so explicitly and leave the tag as `VERIFIED-CODE-REVIEW` or `UNVERIFIED` rather than rounding up.
 
 ### Session End (always do this last, after QA and code quality agents):
 After all work is complete for the session, update HANDOFF.md with the current state. Overwrite the entire file with fresh content each time. Use this exact format:
@@ -170,7 +182,8 @@ Last updated by: [Claude Code | Codex]
 Current phase: Phase N — [Phase Name]
 
 ## Just Completed (this session)
-- [one line per task completed]
+- [one line per task completed] — [VERIFIED-LIVE-PROD | VERIFIED-LIVE-DEV | VERIFIED-CODE-REVIEW | UNVERIFIED]
+  (tag required for any line that claims a bug is fixed, a behavior works, or a QA scenario passed. Plain process/administrative lines — "read HANDOFF.md", "added a new file" — don't need one.)
 
 ## In Progress (incomplete — pick up here first)
 [Exact description of what was started but not finished, and what remains.
@@ -194,7 +207,11 @@ If nothing is in progress, write: None — see Queued Next.]
 [Architectural and design decisions]
 
 ## Unresolved Issues
-[Issues from qa_reports/unresolved_*.md, or "None"]
+[Issues from qa_reports/unresolved_*.md, or "None". Each issue gets a verification
+tag too — e.g. a bug closed as "not reproducible" is a VERIFIED-CODE-REVIEW or
+VERIFIED-LIVE-DEV claim, not automatically resolved; leave it here (not under
+Known Working Features) until it carries a VERIFIED-LIVE-PROD or VERIFIED-LIVE-DEV
+tag from an actual repro attempt.]
 
 ## Files Changed This Session
 [Every file modified, created, or deleted]
@@ -228,9 +245,10 @@ ITERATION LOOP:
 2. For each scenario, QA agent predicts the expected behavior, then describes what actually happens based on reading the implementation code. If it cannot determine behavior from code alone, it flags it explicitly.
 
 3. QA agent writes a report to qa_reports/qa_[timestamp].md containing:
-   - PASS: scenario + observed behavior matches expected
-   - FAIL: scenario + expected behavior + actual behavior + likely cause
-   - UNCLEAR: scenario that needs manual verification
+   - PASS: scenario + observed behavior matches expected + verification tag (`VERIFIED-LIVE-PROD` / `VERIFIED-LIVE-DEV` / `VERIFIED-CODE-REVIEW`)
+   - FAIL: scenario + expected behavior + actual behavior + likely cause + verification tag
+   - UNCLEAR: scenario that needs manual verification (implicitly `UNVERIFIED`)
+   A PASS reached by "reading the implementation code" (per step 2 above) must be tagged `VERIFIED-CODE-REVIEW`, not left to imply it was actually run. Don't let a report's overall "X/Y passed" headline flatten a mix of live-checked and code-read scenarios into one confidence level — the per-scenario tags are what future sessions should trust, not the headline number.
 
 4. Main agent reads the report. For each FAIL:
    - Implements the fix
@@ -240,7 +258,7 @@ ITERATION LOOP:
 
 6. Repeat up to 3 total iterations. After 3 iterations, log any remaining FAILs to qa_reports/unresolved_[timestamp].md and continue.
 
-After the loop completes, QA agent appends a one-line summary to CLAUDE.md under "## QA History": date + feature + pass rate.
+After the loop completes, QA agent appends a one-line summary to CLAUDE.md under "## QA History": date + feature + pass rate + a verification-mix note (e.g. "7 live-verified against real Gemini calls and the real DB, 3 code-reading for failure paths") — don't state a bare pass rate without saying how it was checked, since a future session reading only this line has no other way to know.
 
 ### Agent 2: Code Quality Agent
 
