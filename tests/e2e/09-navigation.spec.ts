@@ -13,14 +13,14 @@ test.describe('Navigation', () => {
   for (const [label, path] of LINKS) {
     test(`${label} link navigates to ${path}`, async ({ page }) => {
       await page.goto('/')
-      await page.getByRole('link', { name: label, exact: false }).click()
+      await page.locator('nav').getByRole('link', { name: label, exact: false }).click()
       await expect(page).toHaveURL(new RegExp(`${path.replace('/', '\\/')}$`))
     })
   }
 
   test('active nav item shows an accent underline and is-active class', async ({ page }) => {
     await page.goto('/goals')
-    const goalsLink = page.getByRole('link', { name: 'Goals', exact: false })
+    const goalsLink = page.locator('nav').getByRole('link', { name: 'Goals', exact: false })
     await expect(goalsLink).toHaveClass(/is-active/)
     await expect(goalsLink.locator('span')).toBeVisible()
   })
@@ -28,7 +28,7 @@ test.describe('Navigation', () => {
   test('no nav link text becomes low-contrast/invisible on hover (dark mode)', async ({ page }) => {
     await page.goto('/')
     for (const [label] of LINKS) {
-      const link = page.getByRole('link', { name: label, exact: false })
+      const link = page.locator('nav').getByRole('link', { name: label, exact: false })
       await link.hover()
       const { fg, bg } = await readEffectiveColors(link)
       expect(fg).not.toBeNull()

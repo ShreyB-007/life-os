@@ -50,7 +50,7 @@ test.describe('Light / Dark Mode', () => {
     for (const mode of ['dark', 'light'] as const) {
       await toggleTo(page, mode)
       for (const label of ['Dashboard', 'Goals', 'Masters', 'Digest', 'Review']) {
-        const link = page.getByRole('link', { name: label, exact: false })
+        const link = page.locator('nav').getByRole('link', { name: label, exact: false })
         await link.hover()
         const { fg, bg } = await readEffectiveColors(link)
         if (fg && bg) expect(contrastRatio(fg, bg), `${label} in ${mode}`).toBeGreaterThan(1.8)
