@@ -13,6 +13,7 @@ const JapaneseCard = forwardRef(function JapaneseCard({ streak, todayLog, allLog
   const [checked, setChecked] = useState({ anki: false, duolingo: false, study: false })
   const [prevDone, setPrevDone] = useState(false)
   const [booped, setBooped] = useState(false)
+  const [saveError, setSaveError] = useState(false)
 
   useEffect(() => {
     if (todayLog?.payload?.subtasks) {
@@ -49,7 +50,13 @@ const JapaneseCard = forwardRef(function JapaneseCard({ streak, todayLog, allLog
       logged_at: new Date().toISOString(),
     }
     onLog('japanese', logEntry)
-    await supabase.from('habit_logs').upsert(logEntry, { onConflict: 'habit_key,log_date' })
+    const { error } = await supabase.from('habit_logs').upsert(logEntry, { onConflict: 'habit_key,log_date' })
+    if (error) {
+      setChecked(todayLog?.payload?.subtasks ?? { anki: false, duolingo: false, study: false })
+      onLog('japanese', todayLog ?? { habit_key: 'japanese', log_date: selectedDate, done: false, is_rest_day: false, payload: {} })
+      setSaveError(true)
+      setTimeout(() => setSaveError(false), 4000)
+    }
   }
 
   return (
@@ -115,6 +122,12 @@ const JapaneseCard = forwardRef(function JapaneseCard({ streak, todayLog, allLog
             {doneCount} of 3 done
           </span>
         </div>
+
+        {saveError && (
+          <p className="mt-2 text-[11px] font-body" style={{ color: '#EF4444' }}>
+            Couldn't save — check your connection and try again.
+          </p>
+        )}
       </div>
     </div>
   )

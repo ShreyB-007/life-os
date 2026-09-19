@@ -23,10 +23,11 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], se
   const [drawerViewOnly, setDrawerViewOnly]      = useState(false)
   const [historyOpen, setHistoryOpen]            = useState(false)
   const [locallyConfirmedType, setLocallyConfirmedType] = useState(null)
+  const [saveError, setSaveError]                = useState(false)
 
-  useEffect(() => {
-    if (todayLog) {
-      const wt = todayLog.payload?.workout_type
+  function syncFromLog(log) {
+    if (log) {
+      const wt = log.payload?.workout_type
       if (wt === 'rest') {
         setIsRest(true)
         setSelected(null)
@@ -34,8 +35,8 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], se
       } else if (wt) {
         setSelected(wt)
         setIsRest(false)
-        setLocallyConfirmedType(todayLog.done ? wt : null)
-      } else if (!todayLog.done) {
+        setLocallyConfirmedType(log.done ? wt : null)
+      } else if (!log.done) {
         setSelected(null)
         setIsRest(false)
         setLocallyConfirmedType(null)
@@ -45,6 +46,11 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], se
       setIsRest(false)
       setLocallyConfirmedType(null)
     }
+  }
+
+  useEffect(() => {
+    syncFromLog(todayLog)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todayLog, selectedDate])
 
   const confirmedWorkoutType =
@@ -68,8 +74,14 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], se
     }
     onLog('gym', logEntry)
     setSaving(true)
-    await supabase.from('habit_logs').upsert(logEntry, { onConflict: 'habit_key,log_date' })
+    const { error } = await supabase.from('habit_logs').upsert(logEntry, { onConflict: 'habit_key,log_date' })
     setSaving(false)
+    if (error) {
+      syncFromLog(todayLog)
+      onLog('gym', todayLog ?? { habit_key: 'gym', log_date: selectedDate, done: false, is_rest_day: false, payload: {} })
+      setSaveError(true)
+      setTimeout(() => setSaveError(false), 4000)
+    }
   }
 
   async function selectWorkout(type) {
@@ -341,6 +353,12 @@ const GymCard = forwardRef(function GymCard({ streak, todayLog, allLogs = [], se
               )}
             </div>
           </div>
+
+          {saveError && (
+            <p className="mt-2 text-[11px] font-body" style={{ color: '#EF4444' }}>
+              Couldn't save — check your connection and try again.
+            </p>
+          )}
         </div>
       </div>
 

@@ -18,8 +18,8 @@ serve(async req => {
 
   try {
     const { weekStartDate, today } = await req.json()
-    if (!weekStartDate) throw new Error('weekStartDate is required')
-    if (!today) throw new Error('today is required')
+    if (!isValidDateString(weekStartDate)) throw new Error('weekStartDate must be a valid date (YYYY-MM-DD)')
+    if (!isValidDateString(today)) throw new Error('today must be a valid date (YYYY-MM-DD)')
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -292,6 +292,11 @@ function addDays(dateStr, days) {
 
 function prevDayStr(dateStr) {
   return addDays(dateStr, -1)
+}
+
+function isValidDateString(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  return !Number.isNaN(new Date(`${value}T00:00:00`).getTime())
 }
 
 function isQuotaError(message) {

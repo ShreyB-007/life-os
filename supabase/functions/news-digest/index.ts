@@ -18,7 +18,7 @@ serve(async req => {
   try {
     const { feedType, generatedDate } = await req.json()
     if (!FEED_TYPES.includes(feedType)) throw new Error('Invalid feedType')
-    if (!generatedDate) throw new Error('generatedDate is required')
+    if (!isValidDateString(generatedDate)) throw new Error('generatedDate must be a valid date (YYYY-MM-DD)')
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -138,6 +138,11 @@ function extractStories(text) {
     summary: String(story.summary ?? '').trim(),
     source_hint: String(story.source_hint ?? '').trim(),
   }))
+}
+
+function isValidDateString(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  return !Number.isNaN(new Date(`${value}T00:00:00`).getTime())
 }
 
 function isQuotaError(message) {

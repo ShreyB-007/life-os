@@ -22,6 +22,9 @@ serve(async req => {
     if (!['initial', 'refresh'].includes(mode)) {
       throw new Error('Invalid research mode')
     }
+    if (!isUuid(entityId)) {
+      throw new Error('Invalid entityId')
+    }
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -43,7 +46,7 @@ serve(async req => {
 async function loadEntityContext(supabase, entityType, entityId) {
   if (entityType === 'country') {
     const { data, error } = await supabase.from('countries').select('*').eq('id', entityId).single()
-    if (error) throw error
+    if (error) throw new Error('Country not found')
     return { country: data }
   }
 
@@ -52,8 +55,13 @@ async function loadEntityContext(supabase, entityType, entityId) {
     .select('*, countries(*)')
     .eq('id', entityId)
     .single()
-  if (error) throw error
+  if (error) throw new Error('University not found')
   return { university: data, country: data.countries }
+}
+
+function isUuid(value) {
+  return typeof value === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 }
 
 async function collectSearchResults(entityType, context, mode) {

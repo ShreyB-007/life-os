@@ -14,6 +14,7 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, allLogs = [], se
   const [prevDone, setPrevDone] = useState(false)
   const [booped, setBooped] = useState(false)
   const [showGraph, setShowGraph] = useState(false)
+  const [saveError, setSaveError] = useState(false)
   const countsRef = useRef(counts)
 
   useEffect(() => {
@@ -56,9 +57,19 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, allLogs = [], se
 
     onLog('dsa', logEntry)
 
-    await supabase
+    const { error } = await supabase
       .from('habit_logs')
       .upsert(logEntry, { onConflict: 'habit_key,log_date' })
+
+    if (error) {
+      const { easy = 0, med = 0, hard = 0 } = todayLog?.payload ?? {}
+      const reverted = { easy, med, hard }
+      countsRef.current = reverted
+      setCounts(reverted)
+      onLog('dsa', todayLog ?? { habit_key: 'dsa', log_date: selectedDate, done: false, is_rest_day: false, payload: {} })
+      setSaveError(true)
+      setTimeout(() => setSaveError(false), 4000)
+    }
   }
 
   function adjust(key, delta) {
@@ -136,6 +147,12 @@ const DSACard = forwardRef(function DSACard({ streak, todayLog, allLogs = [], se
             {isDone ? `${counts.easy}E · ${counts.med}M · ${counts.hard}H solved` : 'Not started'}
           </span>
         </div>
+
+        {saveError && (
+          <p className="mt-2 text-[11px] font-body" style={{ color: '#EF4444' }}>
+            Couldn't save — check your connection and try again.
+          </p>
+        )}
       </div>
     </div>
 

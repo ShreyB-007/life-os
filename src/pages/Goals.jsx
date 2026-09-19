@@ -427,7 +427,7 @@ function GoalCard({ goal, onEdit, onDelete, onProgress }) {
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate font-display text-lg font-semibold text-os-fg">
+              <h2 className="truncate font-display text-lg font-semibold text-os-fg" title={goal.name}>
                 {goal.name}
               </h2>
               <span
