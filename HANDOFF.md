@@ -1,7 +1,7 @@
 # Life OS — Handoff Log
 
 ## Meta
-Last updated: 2026-09-19T13:45:00+05:30
+Last updated: 2026-09-19T14:05:00+05:30
 Last updated by: Claude Code
 Current phase: Post-launch hardening (adversarial QA pass complete)
 
@@ -26,7 +26,13 @@ Current phase: Post-launch hardening (adversarial QA pass complete)
 None — see Queued Next.
 
 ## Queued Next (in priority order)
-1. **Fix the test-suite landmine that caused the data-loss incident above:** `tests/e2e/06-date-selector.spec.ts`'s `afterEach` does `testDb.from('habit_logs').delete().in('log_date', [todayStr(), past3, past5, past7])` with no scoping to fixture data. Change it to either use fixed far-past/far-future dates instead of relative-to-now, or only delete rows it created. This is real technical debt in the test infrastructure, not app code, but it will silently delete real data again the next time the full suite is run on a day where today-N lands on a real logged date.
+1. **[UNVERIFIED / NOT YET FIXED] The Playwright e2e suite (`tests/e2e/`) runs against the real production Supabase database — there is no separate test project.** Several test cleanup routines (at minimum `06-date-selector.spec.ts`'s date-range delete) are NOT scoped to only their own fixture data — they delete real rows matching broad criteria (e.g. any `habit_logs` row on today/-3/-5/-7 days), regardless of whether that data is real or test-created.
+
+   This is currently **accepted as a known risk** because the project has no real personal-use data logged yet — a deliberate decision by the user (Sept 19, 2026), not an oversight.
+
+   **TRIGGER:** Before running the e2e suite (`npm run test:e2e`) again after the user has started actually using the app for real day-to-day habit tracking, the test suite MUST be updated first so every test's cleanup logic only deletes rows it created itself (e.g. via a consistent fixture-tagging convention, matching the `QA-Test-` prefix pattern already used for some Masters/Goals fixtures) — never a blind date-range or broad-match delete.
+
+   **Any future session — Claude Code or Codex — must check this item before running the e2e suite, and ask the user to confirm real data safety if there's any doubt whether this fix has already been applied.**
 2. Ask the user whether they logged Japanese study on 2026-09-14 and, if so, which subtasks (Anki/Duolingo/Study) — that data is genuinely lost and only they can restore it.
 3. Get an explicit decision from the user on the RLS/auth exposure (Finding #3 in the QA report): accept the current "public anon key, no auth, security-through-obscurity-of-the-URL" posture, or plan real authentication as its own project. Not urgent, but shouldn't stay silently undecided.
 4. Monitor real-world Gemini quota usage across Masters + Digest + Review over multiple consecutive days — still not observed, unrelated to this session.
@@ -56,7 +62,7 @@ None — see Queued Next.
 
 ## Unresolved Issues
 - **Real data loss, only user-recoverable:** the exact Japanese-habit subtask breakdown (which of Anki/Duolingo/Study) for 2026-09-14 was permanently deleted by an e2e test suite bug this session (see Just Completed and the QA report's "INCIDENT" section for full detail). The Gym rest day for the same date was successfully restored. — UNVERIFIED whether the user can reconstruct this from memory; nothing more to check on the app side.
-- **Test suite defect:** `tests/e2e/06-date-selector.spec.ts` deletes `habit_logs` for dates computed relative to "now" against the shared production database, without scoping to test fixtures. Will cause the same kind of data loss again the next time the full suite runs on a day where `today-3`/`today-5`/`today-7` lands on a real logged date. — VERIFIED-LIVE-PROD that this is the exact mechanism (confirmed via the incident itself); not yet fixed.
+- **[UNVERIFIED / NOT YET FIXED] Test suite runs against real production data with unscoped cleanup deletes** — see Queued Next #1 for the full trigger condition and required fix before the e2e suite is run again post-real-usage. `tests/e2e/06-date-selector.spec.ts` deletes `habit_logs` for dates computed relative to "now" against the shared production database, without scoping to test fixtures; this is the exact mechanism that caused this session's data-loss incident (VERIFIED-LIVE-PROD, confirmed via the incident itself) and will do so again on any day where `today-3`/`today-5`/`today-7` lands on a real logged date. Currently accepted as a known risk only because there is no real personal-use data logged yet — not a green light to leave unfixed once that changes.
 - RLS/auth exposure (Finding #3) — confirmed real via direct REST calls, deliberately not fixed pending a user decision. — VERIFIED-LIVE-PROD.
 - Cross-tab lost update on Goals progress (Finding #5) — confirmed real, deliberately not fixed as disproportionate for a single-user app. — VERIFIED-LIVE-PROD.
 - `05-dsa-card.spec.ts`'s reload-persistence tests remain flaky under full-suite serial execution against the live dev DB (pre-existing, carried forward again) — VERIFIED-LIVE-DEV that the flake exists; root cause still unaddressed.
